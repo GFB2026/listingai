@@ -21,6 +21,7 @@ known-first-party = ["app"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 addopts = "-v --strict-markers --tb=short"
 markers = ["slow: slow tests", "integration: integration tests"]
 filterwarnings = ["ignore::DeprecationWarning:passlib.*"]

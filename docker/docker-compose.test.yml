@@ -1,0 +1,27 @@
+services:
+  postgres:
+    volumes:
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/20-test-db.sql:ro
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    user: root
+    volumes:
+      - ../backend:/app
+    environment:
+      APP_ENV: testing
+      DATABASE_URL: postgresql+asyncpg://listingai:listingai_dev@postgres:5432/listingai
+      DATABASE_URL_SYNC: postgresql://listingai:listingai_dev@postgres:5432/listingai
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      S3_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "pip install --no-cache-dir -r requirements-dev.txt &&
+             pytest -v --tb=short"

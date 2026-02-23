@@ -1,4 +1,4 @@
-.PHONY: help up down build migrate test lint fmt backend frontend frontend-test frontend-test-cov worker shell db-shell prod-up prod-down prod-build prod-logs staging-up staging-down staging-build load-test
+.PHONY: help up down build migrate test lint fmt backend frontend frontend-test frontend-test-cov worker shell db-shell prod-up prod-down prod-build prod-logs staging-up staging-down staging-build load-test docker-test
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -106,3 +106,9 @@ shell: ## Open backend Python shell
 
 redis-cli: ## Open Redis CLI
 	docker compose -f docker/docker-compose.yml exec redis redis-cli
+
+# Docker test environment
+docker-test: ## Run backend tests inside Docker (postgres + redis)
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.test.yml up -d postgres redis
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.test.yml run --rm backend
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.test.yml down
