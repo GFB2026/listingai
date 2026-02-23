@@ -28,6 +28,7 @@ filterwarnings = ["ignore::DeprecationWarning:passlib.*"]
 [tool.coverage.run]
 source = ["app"]
 omit = ["app/workers/celery_app.py"]
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 show_missing = true

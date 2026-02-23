@@ -33,27 +33,28 @@ class TestCircuitBreaker:
         assert cb.allow_request() is True  # only 2 consecutive failures
 
     def test_half_open_after_recovery(self):
-        cb = _CircuitBreaker(threshold=2, recovery=0.01)
+        cb = _CircuitBreaker(threshold=2, recovery=1)
         cb.record_failure()
         cb.record_failure()
         assert cb.allow_request() is False  # open, recovery not yet elapsed
-        time.sleep(0.02)
+        # Simulate time passing by backdating the last failure
+        cb._last_failure_time = time.monotonic() - 2
         assert cb.allow_request() is True  # recovery elapsed → half_open probe
 
     def test_success_in_half_open_closes(self):
-        cb = _CircuitBreaker(threshold=2, recovery=0.01)
+        cb = _CircuitBreaker(threshold=2, recovery=1)
         cb.record_failure()
         cb.record_failure()
-        time.sleep(0.02)
+        cb._last_failure_time = time.monotonic() - 2
         assert cb.allow_request() is True  # half_open probe
         cb.record_success()
         assert cb.allow_request() is True  # back to closed
 
     def test_failure_in_half_open_reopens(self):
-        cb = _CircuitBreaker(threshold=2, recovery=0.01)
+        cb = _CircuitBreaker(threshold=2, recovery=1)
         cb.record_failure()
         cb.record_failure()
-        time.sleep(0.02)
+        cb._last_failure_time = time.monotonic() - 2
         cb.allow_request()  # transition to half_open
         cb.record_failure()  # probe failed → reopens
         assert cb.allow_request() is False  # reopened, recovery not yet elapsed

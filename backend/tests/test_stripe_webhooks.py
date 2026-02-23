@@ -3,6 +3,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import stripe.error
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -144,6 +145,104 @@ class TestStripeWebhook:
                 "/api/v1/webhooks/stripe",
                 content=json.dumps(event).encode(),
                 headers={"stripe-signature": "valid_sig"},
+            )
+
+        assert response.status_code == 200
+
+
+class TestWebhookEdgeCases:
+    @pytest.mark.asyncio
+    async def test_invalid_payload_returns_400(self, client: AsyncClient):
+        """ValueError from construct_event should return 400."""
+        with patch(
+            "stripe.Webhook.construct_event",
+            side_effect=ValueError("bad payload"),
+        ):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=b"bad",
+                headers={"stripe-signature": "sig"},
+            )
+        assert response.status_code == 400
+        assert "Invalid payload" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_signature_verification_error_returns_400(self, client: AsyncClient):
+        """SignatureVerificationError should return 400."""
+        with patch(
+            "stripe.Webhook.construct_event",
+            side_effect=stripe.error.SignatureVerificationError("bad", "sig"),
+        ):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=b"payload",
+                headers={"stripe-signature": "bad"},
+            )
+        assert response.status_code == 400
+        assert "Invalid signature" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_duplicate_event_skipped(
+        self, client: AsyncClient, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """Duplicate Stripe events should be deduplicated via Redis."""
+        test_tenant.stripe_customer_id = "cus_dedup"
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        event = {
+            "id": "evt_dedup_123",
+            "type": "customer.subscription.created",
+            "data": {
+                "object": {
+                    "id": "sub_x",
+                    "customer": "cus_dedup",
+                    "items": {"data": [{"price": {"id": "price_x"}}]},
+                }
+            },
+        }
+
+        mock_redis = AsyncMock()
+        mock_redis.exists = AsyncMock(return_value=True)  # already processed
+
+        with patch("stripe.Webhook.construct_event", return_value=event), \
+             patch("app.api.v1.webhooks.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps(event).encode(),
+                headers={"stripe-signature": "valid"},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "already_processed"
+
+    @pytest.mark.asyncio
+    async def test_unknown_price_id_logged(
+        self, client: AsyncClient, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """Unknown price_id should be logged but not crash."""
+        test_tenant.stripe_customer_id = "cus_unknown_price"
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        event = {
+            "id": "evt_unknown_price",
+            "type": "customer.subscription.created",
+            "data": {
+                "object": {
+                    "id": "sub_y",
+                    "customer": "cus_unknown_price",
+                    "items": {"data": [{"price": {"id": "price_nonexistent"}}]},
+                }
+            },
+        }
+
+        with patch("stripe.Webhook.construct_event", return_value=event), \
+             patch("app.api.v1.webhooks._get_plan_map", return_value={}):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps(event).encode(),
+                headers={"stripe-signature": "valid"},
             )
 
         assert response.status_code == 200

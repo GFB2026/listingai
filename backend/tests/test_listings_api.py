@@ -1,5 +1,6 @@
-"""Tests for listings API endpoints: list, detail, manual create, filters, pagination."""
+"""Tests for listings API endpoints: list, detail, manual create, filters, pagination, sync."""
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -196,6 +197,99 @@ class TestCreateManualListing:
         # Missing required address_full
         resp = await client.post("/api/v1/listings/manual", headers=headers, json={})
         assert resp.status_code == 422
+
+
+class TestListingsFilterPropertyType:
+    async def test_filter_property_type(
+        self, client: AsyncClient, test_user: User, test_listing: Listing,
+        db_session: AsyncSession, test_tenant: Tenant,
+    ):
+        townhouse = Listing(
+            tenant_id=test_tenant.id,
+            address_full="600 Palm Ave, Miami, FL",
+            property_type="townhouse",
+            status="active",
+        )
+        db_session.add(townhouse)
+        await db_session.flush()
+
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        resp = await client.get("/api/v1/listings?property_type=condo", headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["listings"][0]["property_type"] == "condo"
+
+    async def test_filter_bathrooms(
+        self, client: AsyncClient, test_user: User, test_listing: Listing,
+        db_session: AsyncSession, test_tenant: Tenant,
+    ):
+        one_bath = Listing(
+            tenant_id=test_tenant.id,
+            address_full="700 Elm St, Miami, FL",
+            bathrooms=1,
+            status="active",
+        )
+        db_session.add(one_bath)
+        await db_session.flush()
+
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        resp = await client.get("/api/v1/listings?bathrooms=2", headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1  # only test_listing has 2 bathrooms
+
+
+class TestTriggerSync:
+    async def test_sync_queued(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """Sync endpoint should queue a Celery task."""
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        mock_redis = AsyncMock()
+        mock_redis.exists = AsyncMock(return_value=False)
+        mock_redis.setex = AsyncMock()
+
+        with patch("app.api.v1.listings.get_redis", new_callable=AsyncMock, return_value=mock_redis), \
+             patch("app.workers.tasks.mls_sync.sync_mls_listings") as mock_task:
+            mock_task.delay = MagicMock()
+            resp = await client.post("/api/v1/listings/sync", headers=headers)
+
+        assert resp.status_code == 202
+        data = resp.json()
+        assert data["status"] == "queued"
+
+    async def test_sync_throttled(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """Sync should be throttled if recently triggered."""
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        mock_redis = AsyncMock()
+        mock_redis.exists = AsyncMock(return_value=True)
+        mock_redis.ttl = AsyncMock(return_value=250)
+
+        with patch("app.api.v1.listings.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            resp = await client.post("/api/v1/listings/sync", headers=headers)
+
+        assert resp.status_code == 429
+        assert "Try again" in resp.json()["detail"]
+
+    async def test_sync_redis_unavailable(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """Sync should proceed even if Redis throttle is unavailable."""
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+
+        import redis.exceptions
+        with patch(
+            "app.api.v1.listings.get_redis",
+            new_callable=AsyncMock,
+            side_effect=redis.exceptions.ConnectionError("down"),
+        ), patch("app.workers.tasks.mls_sync.sync_mls_listings") as mock_task:
+            mock_task.delay = MagicMock()
+            resp = await client.post("/api/v1/listings/sync", headers=headers)
+
+        assert resp.status_code == 202
 
 
 class TestListingsAuth:

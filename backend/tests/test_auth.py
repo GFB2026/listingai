@@ -1,4 +1,6 @@
 """Tests for authentication flows: register, login, refresh, logout, token blacklisting."""
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -278,6 +280,41 @@ class TestLoginInactiveUser:
         assert "disabled" in response.json()["detail"].lower()
 
 
+class TestRefreshViaCookie:
+    @pytest.mark.asyncio
+    async def test_refresh_via_cookie(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """Refresh token from cookie should work."""
+        refresh = create_refresh_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id)}
+        )
+        client.cookies.set("refresh_token", refresh)
+        response = await client.post("/api/v1/auth/refresh")
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+
+    @pytest.mark.asyncio
+    async def test_refresh_inactive_user(
+        self, client: AsyncClient, db_session: AsyncSession, test_user: User, test_tenant: Tenant
+    ):
+        """Refresh should fail for inactive user."""
+        test_user.is_active = False
+        db_session.add(test_user)
+        await db_session.flush()
+
+        refresh = create_refresh_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id)}
+        )
+        response = await client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": refresh},
+        )
+        assert response.status_code == 401
+        assert "inactive" in response.json()["detail"].lower()
+
+
 class TestLogoutEndpoint:
     @pytest.mark.asyncio
     async def test_logout(self, client: AsyncClient):
@@ -299,3 +336,31 @@ class TestLogoutEndpoint:
         )
         assert response.status_code == 200
         assert response.json()["detail"] == "Logged out"
+
+    @pytest.mark.asyncio
+    async def test_logout_blacklists_cookie_tokens(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """Logout with access_token and refresh_token cookies should blacklist both."""
+        access = create_access_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id), "role": "admin"}
+        )
+        refresh = create_refresh_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id)}
+        )
+        # Set cookies + CSRF token for the request
+        client.cookies.set("access_token", access)
+        client.cookies.set("refresh_token", refresh)
+        csrf_token = "test-csrf-token"
+        client.cookies.set("csrf_token", csrf_token)
+
+        with patch("app.api.v1.auth.blacklist_token", new_callable=AsyncMock) as mock_blacklist:
+            response = await client.post(
+                "/api/v1/auth/logout",
+                headers={"x-csrf-token": csrf_token},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Logged out"
+        # Both tokens should have been blacklisted
+        assert mock_blacklist.call_count == 2
