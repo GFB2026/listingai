@@ -1,10 +1,11 @@
 from datetime import datetime
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 
 class TenantResponse(BaseModel):
-    id: str
+    id: str | UUID
     name: str
     slug: str
     plan: str
@@ -13,6 +14,10 @@ class TenantResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("id")
+    def serialize_id(self, v):
+        return str(v) if v is not None else None
 
 
 class TenantUpdate(BaseModel):
