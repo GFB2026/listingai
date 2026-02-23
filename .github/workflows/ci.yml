@@ -95,6 +95,7 @@ jobs:
           restore-keys: npm-
       - run: cd frontend && npm ci
       - run: cd frontend && npm run lint
+      - run: cd frontend && npm test
       - run: cd frontend && npx tsc --noEmit
       - name: Audit npm dependencies
         run: cd frontend && npm audit --audit-level=high || true

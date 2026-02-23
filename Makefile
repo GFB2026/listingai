@@ -1,4 +1,4 @@
-.PHONY: help up down build migrate test lint fmt backend frontend worker shell db-shell prod-up prod-down prod-build prod-logs staging-up staging-down staging-build load-test
+.PHONY: help up down build migrate test lint fmt backend frontend frontend-test frontend-test-cov worker shell db-shell prod-up prod-down prod-build prod-logs staging-up staging-down staging-build load-test
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -78,11 +78,18 @@ beat: ## Run Celery Beat scheduler
 	cd backend && celery -A app.workers.celery_app beat --loglevel=info
 
 # Testing
-test: ## Run all backend tests
+test: ## Run all tests (backend + frontend)
 	cd backend && pytest -v
+	cd frontend && npm test
 
 test-cov: ## Run tests with coverage
 	cd backend && pytest --cov=app --cov-report=html -v
+
+frontend-test: ## Run frontend tests
+	cd frontend && npm test
+
+frontend-test-cov: ## Run frontend tests with coverage
+	cd frontend && npm run test:coverage
 
 # Code Quality
 lint: ## Run linting
