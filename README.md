@@ -1,6 +1,6 @@
 # ListingAI - AI-Powered Real Estate Content Engine
 
-> **Version 1.1.0** | 221 tests | 81% coverage | Production-ready
+> **Version 1.2.0** | 274 tests | 85% coverage | Production-ready
 
 Generate listing descriptions, social media posts, email campaigns, flyer copy, and video scripts from MLS data using Claude AI.
 
@@ -152,14 +152,14 @@ GitHub Actions pipeline runs on push to `main`/`master` and PRs:
 ## Testing
 
 ```bash
-make test              # Run all 221 tests
+make test              # Run all 274 tests
 make test-cov          # Tests with HTML coverage report
 cd backend && pytest tests/test_auth.py -v         # Single file
 cd backend && pytest -k "billing" -v               # By keyword
 ```
 
-- **221 tests** across 27 test files, all passing
-- **81% code coverage** (1918/2367 statements) -- CI gate: 60%
+- **274 tests** across 30 test files, all passing
+- **85% code coverage** (2019/2367 statements) -- CI gate: 60%
 - All external services fully mocked -- zero real API calls to Anthropic, Stripe, S3, or MLS during testing
 - No client credentials or secrets used in test execution
 

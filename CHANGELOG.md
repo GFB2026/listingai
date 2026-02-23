@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.0] - 2026-02-23
+
+Deep coverage release — 85% backend test coverage.
+
+### Added
+- 53 new backend tests across 3 new + 5 extended test files (total: 274 tests, 30 files)
+- `test_listing_service.py` — ListingService.upsert_from_mls create, update, skip-none paths
+- `test_adapters.py` — PropertyAdapter/MediaAdapter: ViewDescription list/string, Appliances, GarageSpaces, list_date parsing, status/type mapping
+- `test_redis.py` — RedisPool initialize, client error, close
+- Extended `test_ai_service.py` — brand profile lookup, APIConnectionError, APIStatusError 5xx/4xx, hashtag extraction, circuit breaker half-open
+- Extended `test_worker_tasks.py` — Celery wrapper correlation_id, SoftTimeLimitExceeded, retry for all 3 task files; listing-not-found skip; download error resilience
+- Extended `test_media_api.py` — MediaService.upload(), no-filename fallback, content-length rejection, chunk size limit
+- Extended `test_export_service.py` — PDF export, PDF XSS safety
+- Extended `test_billing_service.py` — Stripe InvalidRequestError, general StripeError on subscription create
+
+### Changed
+- Backend test coverage increased from 81% to 85% (449 -> 348 missed statements)
+- 8 source files now at 100% coverage: ai_service, billing_service, export_service, listing_service, media_service, content_batch, media_process, mls_sync
+- Version bumped to 1.2.0
+- Updated all documentation (README, CLAUDE.md, CHANGELOG, deployment runbook)
+
 ## [1.1.0] - 2026-02-23
 
 Test coverage milestone release.

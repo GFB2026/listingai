@@ -1,6 +1,6 @@
 # ListingAI Deployment Runbook
 
-> **Current version:** 1.1.0 | See [CHANGELOG.md](../CHANGELOG.md) for release notes
+> **Current version:** 1.2.0 | See [CHANGELOG.md](../CHANGELOG.md) for release notes
 
 ## Prerequisites
 
