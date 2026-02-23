@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate marketing content (descriptions, social posts, emails, flyers, video scripts) from MLS listing data. It uses Claude for content generation, with a three-layer prompt system (system prompt + brand voice + listing data).
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 
 ## Tech Stack
 
@@ -17,8 +17,8 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 
 ## Testing
 
-- **274 tests** across 30 test files, all passing
-- **85% code coverage** (2019/2367 statements) — CI gate is 60%
+- **304 tests** across 31 test files, all passing
+- **97% code coverage** (2302/2367 statements) — CI gate is 60%
 - Tests use mocked external services (no real API keys, Stripe, S3, or MLS calls)
 - `asyncio_mode = "auto"` — async tests auto-detected
 - Coverage report: `cd backend && pytest --cov=app --cov-report=term-missing`

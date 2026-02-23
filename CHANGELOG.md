@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.0] - 2026-02-23
+
+Near-complete coverage release — 97% backend test coverage.
+
+### Added
+- 30 new backend tests across 1 new + 6 extended test files (total: 304 tests, 31 files)
+- `test_csrf.py` — CSRF rejection without header, mismatch, valid match, Bearer skip, cookie auto-set
+- Extended `test_rate_limiter.py` — sliding window allow/reject, path-specific limits, prefix limits, fail-open on Redis/Connection/OS errors, 429 with/without oldest entry
+- Extended `test_health.py` — Postgres/Redis/Celery readiness failures, metrics endpoint, CircuitBreakerOpen 503 handler
+- Extended `test_auth.py` — refresh via cookie, refresh inactive user, logout blacklists both cookie tokens
+- Extended `test_listings_api.py` — property_type filter, bathrooms filter, sync queued/throttled/Redis-unavailable
+- Extended `test_stripe_webhooks.py` — invalid payload, signature verification error, duplicate event dedup, unknown price_id
+- Extended `test_circuit_breaker.py` — fixed 3 flaky timing-dependent tests (deterministic time backdating)
+
+### Fixed
+- Coverage tracking for ASGI transport: added `concurrency = ["greenlet", "thread"]` to coverage config, which correctly tracks code executed through httpx ASGITransport (jumped from 85% to 94% with zero new tests)
+- Flaky circuit breaker tests: replaced `time.sleep()` with deterministic `_last_failure_time` backdating
+
+### Changed
+- Backend test coverage increased from 85% to 97% (348 -> 65 missed statements)
+- Version bumped to 1.3.0
+- Updated all documentation (README, CLAUDE.md, CHANGELOG, deployment runbook)
+
 ## [1.2.0] - 2026-02-23
 
 Deep coverage release — 85% backend test coverage.
