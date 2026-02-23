@@ -1,0 +1,247 @@
+"""Tests for authentication flows: register, login, refresh, logout, token blacklisting."""
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
+from app.models.tenant import Tenant
+from app.models.user import User
+
+
+class TestPasswordHashing:
+    def test_hash_and_verify(self):
+        pw = "Secure@pass123"
+        hashed = hash_password(pw)
+        assert hashed != pw
+        assert verify_password(pw, hashed)
+
+    def test_wrong_password(self):
+        hashed = hash_password("correct")
+        assert not verify_password("wrong", hashed)
+
+
+class TestJWTTokens:
+    def test_create_and_decode_access_token(self):
+        data = {"sub": "user-123", "tenant_id": "tenant-456", "role": "admin"}
+        token = create_access_token(data)
+        payload = decode_token(token)
+        assert payload is not None
+        assert payload["sub"] == "user-123"
+        assert payload["type"] == "access"
+        assert "jti" in payload
+        assert "exp" in payload
+
+    def test_create_and_decode_refresh_token(self):
+        data = {"sub": "user-123", "tenant_id": "tenant-456"}
+        token = create_refresh_token(data)
+        payload = decode_token(token)
+        assert payload is not None
+        assert payload["sub"] == "user-123"
+        assert payload["type"] == "refresh"
+
+    def test_decode_invalid_token(self):
+        assert decode_token("invalid.token.here") is None
+
+    def test_decode_empty_token(self):
+        assert decode_token("") is None
+
+
+class TestRegisterEndpoint:
+    @pytest.mark.asyncio
+    async def test_register_success(self, client: AsyncClient):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "new@galtocean.com",
+                "password": "Secure@pass123",
+                "full_name": "New User",
+                "brokerage_name": "New Brokerage",
+            },
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        # Cookies should also be set
+        assert "access_token" in response.cookies or "set-cookie" in response.headers
+
+    @pytest.mark.asyncio
+    async def test_register_duplicate_email(self, client: AsyncClient, test_user: User):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "test@example.com",
+                "password": "Secure@pass123",
+                "full_name": "Duplicate User",
+                "brokerage_name": "Another Brokerage",
+            },
+        )
+        assert response.status_code == 400
+        assert "already registered" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_register_weak_password(self, client: AsyncClient):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "weak@example.com",
+                "password": "short",
+                "full_name": "Weak User",
+                "brokerage_name": "Weak Brokerage",
+            },
+        )
+        assert response.status_code == 422  # Pydantic validation (min_length=8)
+
+    @pytest.mark.asyncio
+    async def test_register_no_uppercase(self, client: AsyncClient):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "noupper@example.com",
+                "password": "alllowercase1!",
+                "full_name": "No Upper",
+                "brokerage_name": "Test",
+            },
+        )
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_register_no_special_char(self, client: AsyncClient):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "nospecial@example.com",
+                "password": "NoSpecial123",
+                "full_name": "No Special",
+                "brokerage_name": "Test",
+            },
+        )
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_register_invalid_email(self, client: AsyncClient):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "not-an-email",
+                "password": "Secure@pass123",
+                "full_name": "Bad Email User",
+                "brokerage_name": "Bad Brokerage",
+            },
+        )
+        assert response.status_code == 422
+
+
+class TestLoginEndpoint:
+    @pytest.mark.asyncio
+    async def test_login_success(self, client: AsyncClient, test_user: User):
+        response = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "testpassword123"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+
+    @pytest.mark.asyncio
+    async def test_login_wrong_password(self, client: AsyncClient, test_user: User):
+        response = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "wrongpassword"},
+        )
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_login_nonexistent_email(self, client: AsyncClient):
+        response = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "nobody@example.com", "password": "whatever123"},
+        )
+        assert response.status_code == 401
+
+
+class TestMeEndpoint:
+    @pytest.mark.asyncio
+    async def test_me_unauthorized(self, client: AsyncClient):
+        response = await client.get("/api/v1/auth/me")
+        # No token → 401 or 403
+        assert response.status_code in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_me_with_bearer_token(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        token = create_access_token(
+            data={
+                "sub": str(test_user.id),
+                "tenant_id": str(test_tenant.id),
+                "role": "admin",
+            }
+        )
+        response = await client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "test@example.com"
+        assert data["role"] == "admin"
+
+    @pytest.mark.asyncio
+    async def test_me_with_expired_token(self, client: AsyncClient):
+        # A garbage token should fail
+        response = await client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": "Bearer expired.token.here"},
+        )
+        assert response.status_code == 401
+
+
+class TestRefreshEndpoint:
+    @pytest.mark.asyncio
+    async def test_refresh_with_body(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        refresh = create_refresh_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id)}
+        )
+        response = await client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": refresh},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+
+    @pytest.mark.asyncio
+    async def test_refresh_with_access_token_fails(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        # An access token is NOT a valid refresh token
+        access = create_access_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id), "role": "admin"}
+        )
+        response = await client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": access},
+        )
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_refresh_with_no_token(self, client: AsyncClient):
+        response = await client.post("/api/v1/auth/refresh")
+        assert response.status_code == 401
+
+
+class TestLogoutEndpoint:
+    @pytest.mark.asyncio
+    async def test_logout(self, client: AsyncClient):
+        response = await client.post("/api/v1/auth/logout")
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Logged out"

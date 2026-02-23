@@ -14,7 +14,7 @@ class TestAuthAPI:
             "/api/v1/auth/register",
             json={
                 "email": "admin@galtocean.com",
-                "password": "securepassword123",
+                "password": "Secure@pass123",
                 "full_name": "Admin User",
                 "brokerage_name": "Galt Ocean Realty",
             },
@@ -38,7 +38,7 @@ class TestAuthAPI:
     @pytest.mark.asyncio
     async def test_me_unauthorized(self, client: AsyncClient):
         response = await client.get("/api/v1/auth/me")
-        assert response.status_code == 403  # No bearer token
+        assert response.status_code == 401  # No bearer token
 
     @pytest.mark.asyncio
     async def test_me_authorized(
@@ -62,7 +62,15 @@ class TestAuthAPI:
 
 class TestHealthCheck:
     @pytest.mark.asyncio
-    async def test_health(self, client: AsyncClient):
-        response = await client.get("/health")
+    async def test_health_live(self, client: AsyncClient):
+        """Liveness probe always returns 200 if the process is running."""
+        response = await client.get("/health/live")
         assert response.status_code == 200
-        assert response.json()["status"] == "healthy"
+        assert response.json()["status"] == "alive"
+
+    @pytest.mark.asyncio
+    async def test_health_ready_degrades_without_redis(self, client: AsyncClient):
+        """Readiness probe returns 503 when Redis/Celery are unavailable."""
+        response = await client.get("/health/ready")
+        assert response.status_code == 503
+        assert response.json()["status"] == "degraded"
