@@ -124,6 +124,58 @@ class TestCreateOrUpdateSubscription:
                 )
 
     @pytest.mark.asyncio
+    async def test_invalid_request_error(self, db_session: AsyncSession, test_tenant: Tenant):
+        """InvalidRequestError on subscription create."""
+        import stripe
+
+        test_tenant.stripe_customer_id = "cus_existing"
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        mock_error = stripe.error.InvalidRequestError("No such price", param="price")
+
+        with (
+            patch(
+                "app.services.billing_service.stripe.Subscription.create",
+                side_effect=mock_error,
+            ),
+            patch("app.services.billing_service.get_settings") as mock_settings,
+        ):
+            mock_settings.return_value.stripe_secret_key = "sk_test"
+
+            service = BillingService(db_session)
+            with pytest.raises(ValueError, match="Invalid subscription request"):
+                await service.create_or_update_subscription(
+                    test_tenant.id, "price_nonexistent"
+                )
+
+    @pytest.mark.asyncio
+    async def test_stripe_error_on_subscription(self, db_session: AsyncSession, test_tenant: Tenant):
+        """General StripeError on subscription create (not customer create)."""
+        import stripe
+
+        test_tenant.stripe_customer_id = "cus_existing"
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        mock_error = stripe.error.StripeError("Payment failed")
+
+        with (
+            patch(
+                "app.services.billing_service.stripe.Subscription.create",
+                side_effect=mock_error,
+            ),
+            patch("app.services.billing_service.get_settings") as mock_settings,
+        ):
+            mock_settings.return_value.stripe_secret_key = "sk_test"
+
+            service = BillingService(db_session)
+            with pytest.raises(ValueError, match="Payment provider error"):
+                await service.create_or_update_subscription(
+                    test_tenant.id, "price_test"
+                )
+
+    @pytest.mark.asyncio
     async def test_plan_mapping_enterprise(self, db_session: AsyncSession, test_tenant: Tenant):
         test_tenant.stripe_customer_id = "cus_existing"
         db_session.add(test_tenant)

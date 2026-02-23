@@ -1,8 +1,9 @@
-"""Tests for Celery worker tasks (async helpers)."""
+"""Tests for Celery worker tasks (async helpers + Celery wrappers)."""
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from celery.exceptions import SoftTimeLimitExceeded
 
 
 class TestSyncTenantHelper:
@@ -98,7 +99,6 @@ class TestSyncMlsListingsCeleryTask:
 
         tenant_id = str(uuid4())
         with patch("app.workers.tasks.mls_sync.asyncio.run") as mock_run:
-            # Task is bound, so call the underlying function
             sync_mls_listings(tenant_id=tenant_id, correlation_id=None)
             mock_run.assert_called_once()
 
@@ -112,6 +112,119 @@ class TestSyncMlsListingsCeleryTask:
         ):
             with pytest.raises(Exception):
                 sync_mls_listings(tenant_id=tenant_id, correlation_id=None)
+
+    def test_celery_task_with_correlation_id(self):
+        from app.workers.tasks.mls_sync import sync_mls_listings
+
+        tenant_id = str(uuid4())
+        with (
+            patch("app.workers.tasks.mls_sync.asyncio.run") as mock_run,
+            patch("app.workers.tasks.mls_sync.structlog.contextvars.bind_contextvars") as mock_bind,
+        ):
+            sync_mls_listings(tenant_id=tenant_id, correlation_id="req-123")
+            mock_bind.assert_called_once_with(correlation_id="req-123")
+            mock_run.assert_called_once()
+
+    def test_celery_task_soft_time_limit(self):
+        from app.workers.tasks.mls_sync import sync_mls_listings
+
+        tenant_id = str(uuid4())
+        with patch(
+            "app.workers.tasks.mls_sync.asyncio.run",
+            side_effect=SoftTimeLimitExceeded(),
+        ):
+            with pytest.raises(SoftTimeLimitExceeded):
+                sync_mls_listings(tenant_id=tenant_id, correlation_id=None)
+
+
+class TestSyncAllTenantsCeleryTask:
+    def test_calls_asyncio_run(self):
+        from app.workers.tasks.mls_sync import sync_all_tenants
+
+        with patch("app.workers.tasks.mls_sync.asyncio.run") as mock_run:
+            sync_all_tenants(correlation_id=None)
+            mock_run.assert_called_once()
+
+    def test_with_correlation_id(self):
+        from app.workers.tasks.mls_sync import sync_all_tenants
+
+        with (
+            patch("app.workers.tasks.mls_sync.asyncio.run"),
+            patch("app.workers.tasks.mls_sync.structlog.contextvars.bind_contextvars") as mock_bind,
+        ):
+            sync_all_tenants(correlation_id="req-456")
+            mock_bind.assert_called_once_with(correlation_id="req-456")
+
+    def test_soft_time_limit(self):
+        from app.workers.tasks.mls_sync import sync_all_tenants
+
+        with patch(
+            "app.workers.tasks.mls_sync.asyncio.run",
+            side_effect=SoftTimeLimitExceeded(),
+        ):
+            with pytest.raises(SoftTimeLimitExceeded):
+                sync_all_tenants(correlation_id=None)
+
+    def test_retries_on_error(self):
+        from app.workers.tasks.mls_sync import sync_all_tenants
+
+        with patch(
+            "app.workers.tasks.mls_sync.asyncio.run",
+            side_effect=Exception("boom"),
+        ):
+            with pytest.raises(Exception):
+                sync_all_tenants(correlation_id=None)
+
+
+class TestBatchGenerateCeleryTask:
+    def test_calls_asyncio_run(self):
+        from app.workers.tasks.content_batch import batch_generate_content
+
+        with patch("app.workers.tasks.content_batch.asyncio.run") as mock_run:
+            batch_generate_content(
+                tenant_id="t1", user_id="u1", listing_ids=["l1"],
+                content_type="listing_description", correlation_id=None,
+            )
+            mock_run.assert_called_once()
+
+    def test_with_correlation_id(self):
+        from app.workers.tasks.content_batch import batch_generate_content
+
+        with (
+            patch("app.workers.tasks.content_batch.asyncio.run"),
+            patch("app.workers.tasks.content_batch.structlog.contextvars.bind_contextvars") as mock_bind,
+        ):
+            batch_generate_content(
+                tenant_id="t1", user_id="u1", listing_ids=["l1"],
+                content_type="listing_description", correlation_id="req-789",
+            )
+            mock_bind.assert_called_once_with(correlation_id="req-789")
+
+    def test_soft_time_limit(self):
+        from app.workers.tasks.content_batch import batch_generate_content
+
+        with patch(
+            "app.workers.tasks.content_batch.asyncio.run",
+            side_effect=SoftTimeLimitExceeded(),
+        ):
+            with pytest.raises(SoftTimeLimitExceeded):
+                batch_generate_content(
+                    tenant_id="t1", user_id="u1", listing_ids=["l1"],
+                    content_type="listing_description", correlation_id=None,
+                )
+
+    def test_retries_on_error(self):
+        from app.workers.tasks.content_batch import batch_generate_content
+
+        with patch(
+            "app.workers.tasks.content_batch.asyncio.run",
+            side_effect=Exception("fail"),
+        ):
+            with pytest.raises(Exception):
+                batch_generate_content(
+                    tenant_id="t1", user_id="u1", listing_ids=["l1"],
+                    content_type="listing_description", correlation_id=None,
+                )
 
 
 class TestBatchGenerateHelper:
@@ -231,6 +344,130 @@ class TestBatchGenerateHelper:
 
         # Commit should still be called
         mock_session.commit.assert_called_once()
+
+
+class TestBatchGenerateListingNotFound:
+    @pytest.mark.asyncio
+    async def test_listing_not_found_skips(self):
+        """When a listing is not found, it's skipped (no error raised)."""
+        from app.workers.tasks.content_batch import _batch_generate
+
+        tenant_id = str(uuid4())
+        user_id = str(uuid4())
+
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.commit = AsyncMock()
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None  # listing not found
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_ai = MagicMock()
+        mock_ai.generate = AsyncMock()
+
+        with (
+            patch("app.core.database.async_session_factory", return_value=mock_session),
+            patch("app.middleware.tenant_context.set_tenant_context", new_callable=AsyncMock),
+            patch("app.services.ai_service.AIService", return_value=mock_ai),
+            patch("app.services.content_service.ContentService"),
+        ):
+            await _batch_generate(
+                tenant_id=tenant_id, user_id=user_id,
+                listing_ids=[str(uuid4())],
+                content_type="listing_description", tone="professional",
+                brand_profile_id=None,
+            )
+
+        # AI should not have been called since listing was not found
+        mock_ai.generate.assert_not_called()
+        mock_session.commit.assert_called_once()
+
+
+class TestDownloadListingPhotosCeleryTask:
+    def test_calls_asyncio_run(self):
+        from app.workers.tasks.media_process import download_listing_photos
+
+        with patch("app.workers.tasks.media_process.asyncio.run") as mock_run:
+            download_listing_photos(
+                tenant_id="t1", listing_id="l1", photo_urls=[], correlation_id=None,
+            )
+            mock_run.assert_called_once()
+
+    def test_with_correlation_id(self):
+        from app.workers.tasks.media_process import download_listing_photos
+
+        with (
+            patch("app.workers.tasks.media_process.asyncio.run"),
+            patch("app.workers.tasks.media_process.structlog.contextvars.bind_contextvars") as mock_bind,
+        ):
+            download_listing_photos(
+                tenant_id="t1", listing_id="l1", photo_urls=[], correlation_id="req-abc",
+            )
+            mock_bind.assert_called_once_with(correlation_id="req-abc")
+
+    def test_soft_time_limit(self):
+        from app.workers.tasks.media_process import download_listing_photos
+
+        with patch(
+            "app.workers.tasks.media_process.asyncio.run",
+            side_effect=SoftTimeLimitExceeded(),
+        ):
+            with pytest.raises(SoftTimeLimitExceeded):
+                download_listing_photos(
+                    tenant_id="t1", listing_id="l1", photo_urls=[], correlation_id=None,
+                )
+
+    def test_retries_on_error(self):
+        from app.workers.tasks.media_process import download_listing_photos
+
+        with patch(
+            "app.workers.tasks.media_process.asyncio.run",
+            side_effect=Exception("fail"),
+        ):
+            with pytest.raises(Exception):
+                download_listing_photos(
+                    tenant_id="t1", listing_id="l1", photo_urls=[], correlation_id=None,
+                )
+
+
+class TestDownloadPhotosErrorHandling:
+    @pytest.mark.asyncio
+    async def test_download_error_continues(self):
+        """Per-photo errors don't stop the batch."""
+        from app.workers.tasks.media_process import _download_photos
+
+        mock_media = MagicMock()
+        mock_media.download_from_url = AsyncMock(
+            side_effect=[Exception("network error"), {"media_id": "m2", "key": "path/2.jpg"}]
+        )
+
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.commit = AsyncMock()
+
+        mock_listing = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_listing
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        with (
+            patch("app.services.media_service.MediaService", return_value=mock_media),
+            patch("app.workers.tasks.media_process.async_session_factory", return_value=mock_session),
+            patch("app.workers.tasks.media_process.set_tenant_context", new_callable=AsyncMock),
+        ):
+            await _download_photos(
+                str(uuid4()), str(uuid4()),
+                [
+                    {"url": "https://example.com/1.jpg", "order": 0},
+                    {"url": "https://example.com/2.jpg", "order": 1},
+                ],
+            )
+
+        # Only the second photo should be stored
+        assert mock_listing.photos == [{"media_id": "m2", "key": "path/2.jpg"}]
 
 
 class TestDownloadPhotosHelper:

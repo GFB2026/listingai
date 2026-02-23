@@ -266,3 +266,121 @@ class TestMediaService:
         assert "key" in result
         assert result["key"].startswith("t1/mls/")
         mock_s3.put_object.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upload_with_file(self):
+        """Test the upload() method (UploadFile path)."""
+        from app.services.media_service import MediaService
+
+        mock_s3 = MagicMock()
+        mock_s3.put_object = MagicMock()
+
+        mock_file = AsyncMock()
+        mock_file.filename = "photo.jpg"
+        mock_file.content_type = "image/jpeg"
+        mock_file.read = AsyncMock(return_value=JPEG_BYTES)
+
+        with patch("app.services.media_service.boto3.client", return_value=mock_s3):
+            service = MediaService()
+            result = await service.upload(mock_file, "tenant-1")
+
+        assert result["filename"] == "photo.jpg"
+        assert result["content_type"] == "image/jpeg"
+        assert result["size"] == len(JPEG_BYTES)
+        assert result["key"].startswith("tenant-1/")
+        assert result["key"].endswith(".jpg")
+        mock_s3.put_object.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upload_no_filename(self):
+        """Fallback extension when filename is None."""
+        from app.services.media_service import MediaService
+
+        mock_s3 = MagicMock()
+        mock_s3.put_object = MagicMock()
+
+        mock_file = AsyncMock()
+        mock_file.filename = None
+        mock_file.content_type = None
+        mock_file.read = AsyncMock(return_value=b"\x00" * 10)
+
+        with patch("app.services.media_service.boto3.client", return_value=mock_s3):
+            service = MediaService()
+            result = await service.upload(mock_file, "tenant-1")
+
+        assert result["key"].endswith(".bin")
+
+    @pytest.mark.asyncio
+    async def test_download_content_length_too_large(self):
+        """Reject download when content-length exceeds limit."""
+        import httpx as _httpx
+        from app.services.media_service import MediaService
+
+        mock_s3 = MagicMock()
+
+        mock_response = MagicMock()
+        mock_response.headers = {"content-length": str(25 * 1024 * 1024)}  # 25 MB
+        mock_response.raise_for_status = MagicMock()
+
+        mock_stream = AsyncMock()
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_stream.__aexit__ = AsyncMock(return_value=None)
+
+        mock_http_client = AsyncMock()
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=None)
+        mock_http_client.stream = MagicMock(return_value=mock_stream)
+
+        with (
+            patch("app.services.media_service.boto3.client", return_value=mock_s3),
+            patch.object(_httpx, "AsyncClient", return_value=mock_http_client),
+        ):
+            service = MediaService()
+            with pytest.raises(ValueError, match="File too large"):
+                await service.download_from_url(
+                    url="https://example.com/big.jpg",
+                    tenant_id="t1",
+                    filename="big.jpg",
+                )
+
+    @pytest.mark.asyncio
+    async def test_download_chunk_exceeds_limit(self):
+        """Reject download when chunked data exceeds size limit."""
+        import httpx as _httpx
+        from app.services.media_service import MediaService
+
+        mock_s3 = MagicMock()
+
+        # No content-length header so the size check is skipped
+        mock_response = MagicMock()
+        mock_response.headers = {"content-type": "image/jpeg"}
+        mock_response.raise_for_status = MagicMock()
+
+        # Yield a chunk bigger than the limit
+        big_chunk = b"\x00" * (21 * 1024 * 1024)
+
+        async def _aiter_bytes(size):
+            yield big_chunk
+
+        mock_response.aiter_bytes = _aiter_bytes
+
+        mock_stream = AsyncMock()
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_stream.__aexit__ = AsyncMock(return_value=None)
+
+        mock_http_client = AsyncMock()
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=None)
+        mock_http_client.stream = MagicMock(return_value=mock_stream)
+
+        with (
+            patch("app.services.media_service.boto3.client", return_value=mock_s3),
+            patch.object(_httpx, "AsyncClient", return_value=mock_http_client),
+        ):
+            service = MediaService()
+            with pytest.raises(ValueError, match="byte limit"):
+                await service.download_from_url(
+                    url="https://example.com/huge.jpg",
+                    tenant_id="t1",
+                    filename="huge.jpg",
+                )
