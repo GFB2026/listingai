@@ -239,9 +239,63 @@ class TestRefreshEndpoint:
         assert response.status_code == 401
 
 
+class TestRegisterDuplicateSlug:
+    @pytest.mark.asyncio
+    async def test_register_duplicate_slug(self, client: AsyncClient):
+        """Two registrations with the same brokerage_name produces a slug conflict."""
+        payload = {
+            "email": "first@example.com",
+            "password": "Secure@pass123",
+            "full_name": "First",
+            "brokerage_name": "Dup Brokerage",
+        }
+        resp1 = await client.post("/api/v1/auth/register", json=payload)
+        assert resp1.status_code == 201
+
+        # Clear cookies to avoid CSRF middleware blocking the second request
+        client.cookies.clear()
+
+        payload2 = {**payload, "email": "second@example.com"}
+        resp2 = await client.post("/api/v1/auth/register", json=payload2)
+        assert resp2.status_code == 400
+        assert "slug already taken" in resp2.json()["detail"]
+
+
+class TestLoginInactiveUser:
+    @pytest.mark.asyncio
+    async def test_inactive_user(
+        self, client: AsyncClient, db_session: AsyncSession, test_user: User
+    ):
+        test_user.is_active = False
+        db_session.add(test_user)
+        await db_session.flush()
+
+        response = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "testpassword123"},
+        )
+        assert response.status_code == 403
+        assert "disabled" in response.json()["detail"].lower()
+
+
 class TestLogoutEndpoint:
     @pytest.mark.asyncio
     async def test_logout(self, client: AsyncClient):
         response = await client.post("/api/v1/auth/logout")
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Logged out"
+
+    @pytest.mark.asyncio
+    async def test_logout_with_bearer(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """Logout via Bearer header (no cookies = CSRF skipped)."""
+        access = create_access_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id), "role": "admin"}
+        )
+        response = await client.post(
+            "/api/v1/auth/logout",
+            headers={"Authorization": f"Bearer {access}"},
+        )
         assert response.status_code == 200
         assert response.json()["detail"] == "Logged out"
