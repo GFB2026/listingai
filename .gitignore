@@ -32,6 +32,12 @@ out/
 .DS_Store
 Thumbs.db
 
+# Claude Code
+.claude/
+
+# TypeScript build info
+*.tsbuildinfo
+
 # Testing
 htmlcov/
 .coverage
