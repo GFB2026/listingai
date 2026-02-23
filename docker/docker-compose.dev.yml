@@ -1,0 +1,22 @@
+# Dev overlay — hot-reload with volume mounts
+# Usage: docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+
+services:
+  backend:
+    volumes:
+      - ../backend:/app
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+  worker:
+    volumes:
+      - ../backend:/app
+
+  beat:
+    volumes:
+      - ../backend:/app
+
+  frontend:
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    command: npm run dev

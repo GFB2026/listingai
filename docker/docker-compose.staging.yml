@@ -33,7 +33,6 @@ services:
   backend:
     restart: unless-stopped
     env_file: ../.env.staging
-    volumes: []
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     depends_on:
       postgres:
@@ -52,7 +51,6 @@ services:
   worker:
     restart: unless-stopped
     env_file: ../.env.staging
-    volumes: []
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,7 +68,6 @@ services:
   beat:
     restart: unless-stopped
     env_file: ../.env.staging
-    volumes: []
     depends_on:
       redis:
         condition: service_healthy
@@ -85,8 +82,6 @@ services:
 
   frontend:
     restart: unless-stopped
-    volumes: []
-    command: ["node", "server.js"]
     deploy:
       resources:
         limits:

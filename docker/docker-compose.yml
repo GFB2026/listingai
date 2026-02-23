@@ -46,22 +46,18 @@ services:
     env_file: ../.env.example
     ports:
       - "8000:8000"
-    volumes:
-      - ../backend:/app
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   worker:
     build:
       context: ..
       dockerfile: docker/worker.Dockerfile
     env_file: ../.env.example
-    volumes:
-      - ../backend:/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,8 +70,6 @@ services:
       context: ..
       dockerfile: docker/worker.Dockerfile
     env_file: ../.env.example
-    volumes:
-      - ../backend:/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,14 +81,13 @@ services:
     build:
       context: ..
       dockerfile: docker/frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     ports:
       - "3000:3000"
-    volumes:
-      - ../frontend:/app
-      - /app/node_modules
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    command: npm run dev
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    command: ["node", "server.js"]
 
 volumes:
   pgdata:

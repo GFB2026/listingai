@@ -20,6 +20,8 @@ export interface Listing {
   features: string[];
   photos: Array<{ url: string; caption?: string }>;
   listing_agent_id: string | null;
+  listing_agent_name: string | null;
+  mls_listing_id: string | null;
   created_at: string;
 }
 

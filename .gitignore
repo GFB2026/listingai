@@ -19,6 +19,8 @@ out/
 # Environment
 .env
 .env.local
+.env.staging
+.env.production
 .env.*.local
 
 # IDE
@@ -37,6 +39,9 @@ Thumbs.db
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Celery
+celerybeat-schedule
 
 # Testing
 htmlcov/

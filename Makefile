@@ -5,16 +5,16 @@ help: ## Show this help
 
 # Docker (dev)
 up: ## Start all services (dev)
-	docker compose -f docker/docker-compose.yml --env-file .env up -d
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml --env-file .env up -d
 
 down: ## Stop all services
-	docker compose -f docker/docker-compose.yml down
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down
 
 build: ## Build all Docker images
-	docker compose -f docker/docker-compose.yml --env-file .env build
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml --env-file .env build
 
 logs: ## Tail logs from all services
-	docker compose -f docker/docker-compose.yml logs -f
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml logs -f
 
 # Docker (production)
 prod-up: ## Start production stack
