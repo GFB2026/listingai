@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.0] - 2026-02-23
+
+Test coverage milestone release.
+
+### Added
+- 74 new backend tests across 9 new test files (total: 221 tests, 27 files)
+- Test coverage for MLS connections API, sync engine, worker tasks, content endpoints, RESO client, media upload/presigned URLs, tenants API, Fernet encryption, and billing service
+- Testing section in README.md with coverage stats and commands
+
+### Fixed
+- UUID-to-string serialization in `MLSConnectionResponse` and `TenantResponse` Pydantic schemas (added `field_serializer` for `id` field)
+
+### Changed
+- Backend test coverage increased from 67% to 81% (785 -> 449 missed statements)
+- Version bumped to 1.1.0 (backend `pyproject.toml`, frontend `package.json`)
+- Updated CLAUDE.md with current test statistics and version info
+- Updated README.md with version badge, test stats, and testing documentation
+- Updated CHANGELOG.md with full release history
+
 ## [1.0.0] - 2026-02-23
 
 Production-ready release with comprehensive hardening across security, reliability, observability, and CI/CD.

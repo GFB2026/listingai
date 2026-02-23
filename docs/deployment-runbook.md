@@ -1,5 +1,7 @@
 # ListingAI Deployment Runbook
 
+> **Current version:** 1.1.0 | See [CHANGELOG.md](../CHANGELOG.md) for release notes
+
 ## Prerequisites
 
 - Docker & Docker Compose v2 installed on the host
