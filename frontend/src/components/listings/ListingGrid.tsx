@@ -1,9 +1,10 @@
 "use client";
 
+import type { Listing } from "@/hooks/useListings";
 import { ListingCard } from "./ListingCard";
 
 interface Props {
-  listings: any[];
+  listings: Listing[];
   total: number;
   page: number;
   onPageChange: (page: number) => void;

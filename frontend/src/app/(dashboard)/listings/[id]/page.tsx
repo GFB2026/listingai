@@ -2,9 +2,8 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
+import { useListing, type Listing } from "@/hooks/useListings";
 
 export default function ListingDetailPage({
   params,
@@ -13,13 +12,7 @@ export default function ListingDetailPage({
 }) {
   const { id } = use(params);
 
-  const { data: listing, isLoading } = useQuery({
-    queryKey: ["listing", id],
-    queryFn: async () => {
-      const res = await api.get(`/listings/${id}`);
-      return res.data;
-    },
-  });
+  const { data: listing, isLoading } = useListing(id);
 
   if (isLoading) {
     return <div className="py-12 text-center text-gray-400">Loading...</div>;
@@ -111,6 +104,27 @@ export default function ListingDetailPage({
           )}
         </div>
       </div>
+
+      {/* Photo Gallery */}
+      {listing.photos?.length > 0 && (
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-gray-800">Photos</h2>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {listing.photos.map((photo, i) => {
+              const src = photo.url;
+              if (!src) return null;
+              return (
+                <img
+                  key={i}
+                  src={src}
+                  alt={`Listing photo ${i + 1}`}
+                  className="h-48 w-64 flex-shrink-0 rounded-lg object-cover"
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Original Description */}
       {listing.description_original && (

@@ -37,7 +37,7 @@ class ContentService:
             content_type=content_type,
             tone=tone,
             body=body,
-            metadata=metadata,
+            content_metadata=metadata,
             ai_model=ai_model,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -51,7 +51,7 @@ class ContentService:
             content_id=content.id,
             version=1,
             body=body,
-            metadata=metadata,
+            content_metadata=metadata,
         )
         self.db.add(version)
 
@@ -80,7 +80,9 @@ class ContentService:
         result = await self.db.execute(
             select(Tenant.monthly_generation_limit).where(Tenant.id == tenant_id)
         )
-        limit = result.scalar() or 50
+        limit = result.scalar()
+        if limit is None:
+            limit = 50
 
         # Get current month's usage
         now = datetime.now(timezone.utc)

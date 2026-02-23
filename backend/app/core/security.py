@@ -1,9 +1,11 @@
 import hashlib
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from starlette.responses import Response
 
 from app.config import get_settings
 
@@ -24,7 +26,11 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.jwt_access_token_expire_minutes)
     )
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({
+        "exp": expire,
+        "type": "access",
+        "jti": str(uuid.uuid4()),
+    })
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
@@ -32,7 +38,11 @@ def create_refresh_token(data: dict) -> str:
     settings = get_settings()
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({
+        "exp": expire,
+        "type": "refresh",
+        "jti": str(uuid.uuid4()),
+    })
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
@@ -43,6 +53,37 @@ def decode_token(token: str) -> dict | None:
         return payload
     except JWTError:
         return None
+
+
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Set httpOnly auth cookies on the response."""
+    settings = get_settings()
+    secure = settings.app_env == "production"
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=settings.jwt_access_token_expire_minutes * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=settings.jwt_refresh_token_expire_days * 86400,
+        path="/api/v1/auth",
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Delete auth cookies from the response."""
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/api/v1/auth")
 
 
 def generate_api_key() -> tuple[str, str, str]:

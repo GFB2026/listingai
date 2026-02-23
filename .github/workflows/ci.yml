@@ -1,0 +1,129 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-lint-${{ hashFiles('backend/requirements-dev.txt') }}
+          restore-keys: pip-lint-
+      - run: pip install ruff
+      - run: ruff check backend/app/
+
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: listingai
+          POSTGRES_PASSWORD: listingai_dev
+          POSTGRES_DB: listingai_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-test-${{ hashFiles('backend/requirements-dev.txt') }}
+          restore-keys: pip-test-
+      - run: pip install -r backend/requirements-dev.txt
+      - run: cd backend && pytest --cov=app --cov-fail-under=60 -v
+        env:
+          DATABASE_URL: postgresql+asyncpg://listingai:listingai_dev@localhost:5432/listingai_test
+          DATABASE_URL_SYNC: postgresql://listingai:listingai_dev@localhost:5432/listingai_test
+          REDIS_URL: redis://localhost:6379/0
+          APP_ENV: testing
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: backend/.coverage
+
+  backend-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-security-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: pip-security-
+      - run: pip install pip-audit bandit
+      - name: Audit Python dependencies
+        run: pip-audit -r backend/requirements.txt
+      - name: Run SAST (bandit)
+        run: bandit -r backend/app/ -ll -q
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-
+      - run: cd frontend && npm ci
+      - run: cd frontend && npm run lint
+      - run: cd frontend && npx tsc --noEmit
+      - name: Audit npm dependencies
+        run: cd frontend && npm audit --audit-level=high || true
+      - run: cd frontend && npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+  docker-security:
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -f docker/backend.Dockerfile -t listingai-backend:ci .
+      - name: Build frontend image
+        run: docker build -f docker/frontend.Dockerfile -t listingai-frontend:ci .
+      - name: Trivy scan backend
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: listingai-backend:ci
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+      - name: Trivy scan frontend
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: listingai-frontend:ci
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true

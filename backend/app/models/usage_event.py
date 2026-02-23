@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.database import Base
@@ -17,7 +17,7 @@ class UsageEvent(Base, TenantMixin):
     content_type = Column(String(30))
     tokens_used = Column(Integer, default=0)
     credits_consumed = Column(Integer, default=1)
-    stripe_reported = Column(Boolean, default=False)
+    stripe_reported = Column(Boolean, server_default=text("false"), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

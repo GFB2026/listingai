@@ -15,10 +15,10 @@ class Tenant(Base, TimestampMixin):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     slug = Column(String(100), unique=True, nullable=False)
-    plan = Column(String(50), default="free")
+    plan = Column(String(50), server_default="free", nullable=False)
     stripe_customer_id = Column(String(255))
     stripe_subscription_id = Column(String(255))
-    monthly_generation_limit = Column(Integer, default=50)
+    monthly_generation_limit = Column(Integer, server_default="50", nullable=False)
     settings = Column(JSONB, default=dict)
 
     # Relationships

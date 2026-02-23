@@ -1,9 +1,8 @@
 "use client";
 
 import { use, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
 import { formatPrice, CONTENT_TYPES, TONES } from "@/lib/utils";
+import { useListing } from "@/hooks/useListings";
 import { useGenerate } from "@/hooks/useGenerate";
 import { ContentTypeSelector } from "@/components/content-generator/ContentTypeSelector";
 import { ToneSelector } from "@/components/content-generator/ToneSelector";
@@ -24,13 +23,7 @@ export default function ContentGeneratorPage({
   const [instructions, setInstructions] = useState("");
   const [variants, setVariants] = useState(1);
 
-  const { data: listing } = useQuery({
-    queryKey: ["listing", id],
-    queryFn: async () => {
-      const res = await api.get(`/listings/${id}`);
-      return res.data;
-    },
-  });
+  const { data: listing } = useListing(id);
 
   const { mutate: generate, data: result, isPending } = useGenerate();
 

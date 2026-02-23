@@ -1,7 +1,11 @@
 {
   "name": "listingai-frontend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -27,7 +31,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.6.0",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "@sentry/nextjs": "^8.45.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

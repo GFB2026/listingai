@@ -7,7 +7,7 @@ interface ContentItem {
   content_type: string;
   tone: string;
   body: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, string | number | string[]>;
   ai_model: string;
   version: number;
 }

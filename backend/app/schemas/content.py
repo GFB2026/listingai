@@ -1,33 +1,60 @@
 from datetime import datetime
+from enum import StrEnum
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_serializer, field_validator
+
+
+class ContentType(StrEnum):
+    LISTING_DESCRIPTION = "listing_description"
+    SOCIAL_INSTAGRAM = "social_instagram"
+    SOCIAL_FACEBOOK = "social_facebook"
+    SOCIAL_LINKEDIN = "social_linkedin"
+    SOCIAL_X = "social_x"
+    EMAIL_JUST_LISTED = "email_just_listed"
+    EMAIL_OPEN_HOUSE = "email_open_house"
+    EMAIL_DRIP = "email_drip"
+    FLYER = "flyer"
+    VIDEO_SCRIPT = "video_script"
+
+
+class Tone(StrEnum):
+    LUXURY = "luxury"
+    PROFESSIONAL = "professional"
+    CASUAL = "casual"
+    FRIENDLY = "friendly"
+    URGENT = "urgent"
 
 
 class ContentGenerateRequest(BaseModel):
     listing_id: str
-    content_type: str  # listing_description, social_instagram, social_facebook, etc.
-    tone: str = "professional"  # luxury, professional, casual, friendly, urgent
+    content_type: ContentType
+    tone: Tone = Tone.PROFESSIONAL
     brand_profile_id: str | None = None
-    instructions: str | None = None
-    variants: int = 1
+    instructions: str | None = Field(default=None, max_length=2000)
+    variants: int = Field(default=1, ge=1, le=5)
 
 
 class ContentResponse(BaseModel):
-    id: str
+    id: str | UUID
     content_type: str
     tone: str | None
     body: str
-    metadata: dict
+    metadata: dict = Field(validation_alias="content_metadata")
     status: str
     ai_model: str | None
     prompt_tokens: int | None
     completion_tokens: int | None
     generation_time_ms: int | None
     version: int
-    listing_id: str | None
+    listing_id: str | UUID | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("id", "listing_id")
+    def serialize_uuids(self, v):
+        return str(v) if v is not None else None
 
 
 class ContentGenerateResponse(BaseModel):
@@ -36,8 +63,8 @@ class ContentGenerateResponse(BaseModel):
 
 
 class ContentUpdate(BaseModel):
-    body: str | None = None
-    status: str | None = None
+    body: str | None = Field(default=None, max_length=50000)
+    status: str | None = Field(default=None, pattern=r"^(draft|published|archived)$")
     metadata: dict | None = None
 
 
@@ -49,7 +76,28 @@ class ContentListResponse(BaseModel):
 
 
 class ContentBatchRequest(BaseModel):
-    listing_ids: list[str]
-    content_type: str
-    tone: str = "professional"
+    listing_ids: list[str] = Field(..., min_length=1, max_length=50)
+    content_type: ContentType
+    tone: Tone = Tone.PROFESSIONAL
     brand_profile_id: str | None = None
+
+    @field_validator("listing_ids")
+    @classmethod
+    def deduplicate_listing_ids(cls, v: list[str]) -> list[str]:
+        seen: set[str] = set()
+        unique: list[str] = []
+        for lid in v:
+            if lid not in seen:
+                seen.add(lid)
+                unique.append(lid)
+        return unique
+
+
+class BatchQueueResponse(BaseModel):
+    message: str
+    listing_count: int
+
+
+class SyncQueueResponse(BaseModel):
+    message: str
+    status: str

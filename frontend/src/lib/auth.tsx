@@ -29,7 +29,7 @@ interface AuthContextType {
     full_name: string;
     brokerage_name: string;
   }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,33 +39,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  const fetchUser = useCallback(async () => {
+  const fetchUser = useCallback(async (signal?: AbortSignal) => {
     try {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-      const response = await api.get("/auth/me");
+      const response = await api.get("/auth/me", { signal });
       setUser(response.data);
-    } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+    } catch (error: unknown) {
+      if (signal?.aborted) return;
+      setUser(null);
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchUser();
+    const controller = new AbortController();
+    fetchUser(controller.signal);
+    return () => controller.abort();
   }, [fetchUser]);
 
   const login = async (email: string, password: string) => {
-    const response = await api.post("/auth/login", { email, password });
-    localStorage.setItem("access_token", response.data.access_token);
-    localStorage.setItem("refresh_token", response.data.refresh_token);
+    await api.post("/auth/login", { email, password });
     await fetchUser();
-    router.push("/");
+    router.push("/listings");
   };
 
   const register = async (data: {
@@ -74,16 +71,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     full_name: string;
     brokerage_name: string;
   }) => {
-    const response = await api.post("/auth/register", data);
-    localStorage.setItem("access_token", response.data.access_token);
-    localStorage.setItem("refresh_token", response.data.refresh_token);
+    await api.post("/auth/register", data);
     await fetchUser();
-    router.push("/");
+    router.push("/listings");
   };
 
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Ignore errors — clear state regardless
+    }
     setUser(null);
     router.push("/login");
   };

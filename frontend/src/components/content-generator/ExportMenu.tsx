@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import api from "@/lib/api";
+import { useToastStore } from "@/hooks/useToast";
 
 interface Props {
   contentId: string;
@@ -18,19 +19,27 @@ export function ExportMenu({ contentId }: Props) {
   const [open, setOpen] = useState(false);
 
   const handleExport = async (format: string) => {
-    const response = await api.get(`/content/${contentId}/export/${format}`, {
-      responseType: "blob",
-    });
+    try {
+      const response = await api.get(`/content/${contentId}/export/${format}`, {
+        responseType: "blob",
+      });
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `content-${contentId}.${format}`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-    setOpen(false);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `content-${contentId}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setOpen(false);
+    } catch {
+      useToastStore.getState().toast({
+        title: "Export failed",
+        description: `Could not export as ${format}. Please try again.`,
+        variant: "error",
+      });
+    }
   };
 
   return (

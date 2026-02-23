@@ -1,5 +1,7 @@
+import structlog
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import task_failure
 
 from app.config import get_settings
 
@@ -25,6 +27,13 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    result_expires=3600,
+    task_soft_time_limit=300,
+    task_time_limit=360,
+    task_reject_on_worker_lost=True,
+    # Graceful shutdown — restart workers to prevent memory leaks
+    worker_max_tasks_per_child=200,
+    worker_max_memory_per_child=512_000,  # 512 MB
 )
 
 # Periodic tasks
@@ -34,3 +43,19 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=f"*/{settings.mls_sync_interval_minutes}"),
     },
 }
+
+
+@task_failure.connect
+def handle_task_permanent_failure(sender=None, task_id=None, exception=None,
+                                  args=None, kwargs=None, traceback=None,
+                                  einfo=None, **kw):
+    """Log tasks that have exhausted all retries for post-mortem investigation."""
+    logger = structlog.get_logger()
+    logger.error(
+        "task_permanently_failed",
+        task_name=sender.name if sender else "unknown",
+        task_id=task_id,
+        args=args,
+        kwargs=kwargs,
+        error=str(exception),
+    )

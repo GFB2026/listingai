@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
+import type { ContentItem } from "@/hooks/useContent";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -97,7 +98,7 @@ export default function DashboardPage() {
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           {recentContent?.content?.length ? (
             <ul className="divide-y divide-gray-100">
-              {recentContent.content.map((item: any) => (
+              {recentContent.content.map((item: ContentItem) => (
                 <li key={item.id} className="flex items-center justify-between px-4 py-3">
                   <div>
                     <span className="text-sm font-medium text-gray-900">

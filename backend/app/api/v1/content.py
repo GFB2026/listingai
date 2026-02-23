@@ -6,11 +6,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_tenant_db
+from app.models.brand_profile import BrandProfile
 from app.models.content import Content
 from app.models.content_version import ContentVersion
 from app.models.listing import Listing
 from app.models.user import User
 from app.schemas.content import (
+    BatchQueueResponse,
     ContentBatchRequest,
     ContentGenerateRequest,
     ContentGenerateResponse,
@@ -41,9 +43,28 @@ async def generate_content(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
+    # Validate brand profile exists and belongs to tenant
+    if request.brand_profile_id:
+        bp_result = await db.execute(
+            select(BrandProfile).where(
+                BrandProfile.id == UUID(request.brand_profile_id),
+                BrandProfile.tenant_id == user.tenant_id,
+            )
+        )
+        if not bp_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Brand profile not found")
+
+    # Check credit budget BEFORE calling Claude API
+    content_service = ContentService(db)
+    remaining = await content_service.get_remaining_credits(user.tenant_id)
+    if remaining < request.variants:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient credits. {remaining} remaining, {request.variants} required.",
+        )
+
     # Generate content via AI service
     ai_service = AIService()
-    content_service = ContentService(db)
 
     generated_items = []
     for _ in range(request.variants):
@@ -75,19 +96,20 @@ async def generate_content(
         )
         generated_items.append(content_item)
 
-    # Track usage
+    # Track usage — same session/transaction as content creation above,
+    # so both commit or both roll back together.
     await content_service.track_usage(
         tenant_id=user.tenant_id,
         user_id=user.id,
         content_type=request.content_type,
-        count=request.variants,
+        count=len(generated_items),
         tokens=sum(c.prompt_tokens + c.completion_tokens for c in generated_items if c.prompt_tokens),
     )
 
     return ContentGenerateResponse(
         content=[ContentResponse.model_validate(c) for c in generated_items],
         usage={
-            "credits_consumed": request.variants,
+            "credits_consumed": len(generated_items),
             "credits_remaining": await content_service.get_remaining_credits(user.tenant_id),
         },
     )
@@ -98,7 +120,7 @@ async def list_content(
     content_type: str | None = None,
     listing_id: str | None = None,
     status_filter: str | None = Query(None, alias="status"),
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=1000),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
@@ -171,7 +193,7 @@ async def update_content(
             content_id=item.id,
             version=item.version,
             body=item.body,
-            metadata=item.metadata or {},
+            content_metadata=item.content_metadata or {},
             edited_by=user.id,
         )
         db.add(version)
@@ -181,10 +203,28 @@ async def update_content(
     if update.status is not None:
         item.status = update.status
     if update.metadata is not None:
-        item.metadata = update.metadata
+        item.content_metadata = update.metadata
 
     db.add(item)
     return item
+
+
+@router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_content(
+    content_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    result = await db.execute(
+        select(Content).where(
+            Content.id == UUID(content_id),
+            Content.tenant_id == user.tenant_id,
+        )
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Content not found")
+    await db.delete(item)
 
 
 @router.post("/{content_id}/regenerate", response_model=ContentResponse)
@@ -235,15 +275,23 @@ async def export_content(
         raise HTTPException(status_code=404, detail="Content not found")
 
     export_service = ExportService()
-    return await export_service.export(item, format)
+    try:
+        return await export_service.export(item, format)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
-@router.post("/batch", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/batch", response_model=BatchQueueResponse, status_code=status.HTTP_202_ACCEPTED)
 async def batch_generate(
     request: ContentBatchRequest,
     user: User = Depends(get_current_user),
 ):
+    import structlog.contextvars
+
     from app.workers.tasks.content_batch import batch_generate_content
+
+    ctx = structlog.contextvars.get_contextvars()
+    correlation_id = ctx.get("request_id")
 
     batch_generate_content.delay(
         tenant_id=str(user.tenant_id),
@@ -252,5 +300,6 @@ async def batch_generate(
         content_type=request.content_type,
         tone=request.tone,
         brand_profile_id=request.brand_profile_id,
+        correlation_id=correlation_id,
     )
-    return {"message": "Batch generation queued", "listing_count": len(request.listing_ids)}
+    return BatchQueueResponse(message="Batch generation queued", listing_count=len(request.listing_ids))

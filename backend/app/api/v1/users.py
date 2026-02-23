@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,8 +62,6 @@ async def update_user(
     admin: User = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_tenant_db),
 ):
-    from uuid import UUID
-
     result = await db.execute(
         select(User).where(User.id == UUID(user_id), User.tenant_id == admin.tenant_id)
     )
@@ -78,3 +78,25 @@ async def update_user(
 
     db.add(target)
     return target
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: str,
+    admin: User = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    target_id = UUID(user_id)
+
+    # Prevent admin from deleting themselves
+    if target_id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    result = await db.execute(
+        select(User).where(User.id == target_id, User.tenant_id == admin.tenant_id)
+    )
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await db.delete(target)

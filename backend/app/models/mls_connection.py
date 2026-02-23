@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, LargeBinary, String
+from sqlalchemy import Boolean, Column, DateTime, LargeBinary, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -20,13 +20,18 @@ class MLSConnection(Base, TenantMixin):
     client_secret_encrypted = Column(LargeBinary, nullable=False)
     access_token_encrypted = Column(LargeBinary)
     token_expires_at = Column(DateTime(timezone=True))
-    sync_enabled = Column(Boolean, default=True)
+    sync_enabled = Column(Boolean, server_default=text("true"), nullable=False)
     last_sync_at = Column(DateTime(timezone=True))
     sync_watermark = Column(String(50))
     settings = Column(JSONB, default=dict)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # Relationships

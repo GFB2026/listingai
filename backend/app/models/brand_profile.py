@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, String, Text
+from sqlalchemy import Boolean, Column, DateTime, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -14,7 +14,7 @@ class BrandProfile(Base, TenantMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False)
-    is_default = Column(Boolean, default=False)
+    is_default = Column(Boolean, server_default=text("false"), nullable=False)
     voice_description = Column(Text)
     vocabulary = Column(JSONB, default=list)
     avoid_words = Column(JSONB, default=list)
@@ -23,6 +23,11 @@ class BrandProfile(Base, TenantMixin):
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # Relationships

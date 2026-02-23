@@ -1,0 +1,103 @@
+groups:
+  - name: listingai-backend
+    rules:
+      # --- Availability ---
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High 5xx error rate (>5%)"
+          description: "{{ $value | humanizePercentage }} of requests are returning 5xx over the last 5 minutes."
+
+      - alert: BackendDown
+        expr: up{job="listingai-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend is unreachable"
+          description: "Prometheus cannot scrape the backend /metrics endpoint."
+
+      # --- Latency ---
+
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+          > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 latency exceeds 5 seconds"
+          description: "The 99th percentile latency is {{ $value | humanizeDuration }}."
+
+      - alert: HighP50Latency
+        expr: |
+          histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+          > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Median latency exceeds 1 second"
+          description: "The 50th percentile latency is {{ $value | humanizeDuration }}."
+
+      # --- Throughput ---
+
+      - alert: HighRequestRate
+        expr: sum(rate(http_requests_total[1m])) > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Request rate exceeds 500 req/s"
+          description: "Sustained {{ $value | humanize }} requests/second for 5 minutes."
+
+      - alert: NoTraffic
+        expr: sum(rate(http_requests_total[5m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No traffic for 10 minutes"
+          description: "Backend has received zero requests in the last 10 minutes."
+
+      # --- Concurrency ---
+
+      - alert: HighConcurrentRequests
+        expr: sum(http_requests_in_progress) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 100 concurrent requests"
+          description: "{{ $value }} requests currently in-flight."
+
+      # --- Auth errors ---
+
+      - alert: HighAuthFailureRate
+        expr: |
+          sum(rate(http_requests_total{path=~"/api/v1/auth/.*", status="401"}[5m]))
+          / sum(rate(http_requests_total{path=~"/api/v1/auth/.*"}[5m])) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High auth failure rate (>30%)"
+          description: "{{ $value | humanizePercentage }} of auth requests are failing."
+
+  - name: infrastructure
+    rules:
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+          description: "Target {{ $labels.instance }} has been unreachable for 5 minutes."

@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -21,11 +22,7 @@ export default function DashboardLayout({
   }, [user, isLoading, router]);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!user) return null;

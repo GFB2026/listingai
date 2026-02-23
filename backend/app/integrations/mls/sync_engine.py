@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,10 +68,18 @@ class SyncEngine:
                             mls_data=normalized,
                         )
 
-                        # Track latest timestamp
+                        # Track latest timestamp (parse to datetime for safe comparison)
                         mod_ts = record.get("ModificationTimestamp")
-                        if mod_ts and (not latest_timestamp or mod_ts > latest_timestamp):
-                            latest_timestamp = mod_ts
+                        if mod_ts:
+                            mod_dt = datetime.fromisoformat(mod_ts.replace("Z", "+00:00"))
+                            if latest_timestamp:
+                                latest_dt = datetime.fromisoformat(
+                                    latest_timestamp.replace("Z", "+00:00")
+                                )
+                                if mod_dt > latest_dt:
+                                    latest_timestamp = mod_ts
+                            else:
+                                latest_timestamp = mod_ts
 
                         stats["created" if not normalized.get("id") else "updated"] += 1
 
@@ -90,9 +100,7 @@ class SyncEngine:
             # Update watermark
             if latest_timestamp:
                 connection.sync_watermark = latest_timestamp
-            connection.last_sync_at = __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc
-            )
+            connection.last_sync_at = datetime.now(timezone.utc)
             self.db.add(connection)
 
         finally:

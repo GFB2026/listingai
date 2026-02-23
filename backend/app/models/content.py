@@ -18,13 +18,13 @@ class Content(Base, TenantMixin, TimestampMixin):
     content_type = Column(String(30), nullable=False)
     tone = Column(String(30))
     body = Column(Text, nullable=False)
-    metadata = Column(JSONB, default=dict)
-    status = Column(String(20), default="draft")  # draft, approved, published, archived
+    content_metadata = Column("metadata", JSONB, default=dict)
+    status = Column(String(20), server_default="draft", nullable=False)  # draft, approved, published, archived
     ai_model = Column(String(50))
     prompt_tokens = Column(Integer)
     completion_tokens = Column(Integer)
     generation_time_ms = Column(Integer)
-    version = Column(Integer, default=1)
+    version = Column(Integer, server_default="1", nullable=False)
 
     # Relationships
     tenant = relationship("Tenant", back_populates="content")

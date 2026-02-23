@@ -1,11 +1,23 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
+import { initSentry } from "@/lib/sentry";
+
+initSentry();
 
 export const metadata: Metadata = {
-  title: "ListingAI - AI-Powered Real Estate Content",
+  title: {
+    default: "ListingAI - AI-Powered Real Estate Content",
+    template: "%s | ListingAI",
+  },
   description:
     "Generate listing descriptions, social media posts, email campaigns, and more from your MLS data.",
+  robots: { index: false, follow: false },
+  icons: { icon: "/favicon.ico" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1a365d",
 };
 
 export default function RootLayout({

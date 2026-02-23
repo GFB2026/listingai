@@ -3,6 +3,26 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { useToastStore } from "@/hooks/useToast";
+
+interface BrandProfile {
+  id: string;
+  name: string;
+  is_default: boolean;
+  voice_description: string | null;
+  vocabulary: string[];
+  avoid_words: string[];
+  sample_content: string | null;
+}
+
+interface BrandProfileFormData {
+  name: string;
+  voice_description: string;
+  vocabulary: string;
+  avoid_words: string;
+  sample_content: string;
+  is_default: boolean;
+}
 
 export default function BrandProfilesPage() {
   const queryClient = useQueryClient();
@@ -16,7 +36,7 @@ export default function BrandProfilesPage() {
     is_default: false,
   });
 
-  const { data: profiles, isLoading } = useQuery({
+  const { data: profiles, isLoading } = useQuery<BrandProfile[]>({
     queryKey: ["brand-profiles"],
     queryFn: async () => {
       const res = await api.get("/brand-profiles");
@@ -25,14 +45,14 @@ export default function BrandProfilesPage() {
   });
 
   const createProfile = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: BrandProfileFormData) => {
       return api.post("/brand-profiles", {
         ...data,
         vocabulary: data.vocabulary
-          ? data.vocabulary.split(",").map((s: string) => s.trim())
+          ? data.vocabulary.split(",").map((s) => s.trim())
           : [],
         avoid_words: data.avoid_words
-          ? data.avoid_words.split(",").map((s: string) => s.trim())
+          ? data.avoid_words.split(",").map((s) => s.trim())
           : [],
       });
     },
@@ -179,7 +199,7 @@ export default function BrandProfilesPage() {
         {isLoading ? (
           <p className="text-center text-gray-400">Loading...</p>
         ) : profiles?.length ? (
-          profiles.map((profile: any) => (
+          profiles.map((profile: BrandProfile) => (
             <div
               key={profile.id}
               className="rounded-lg border border-gray-200 bg-white p-6"

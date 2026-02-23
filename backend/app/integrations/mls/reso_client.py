@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -32,7 +33,7 @@ class RESOClient:
 
         self.access_token = data["access_token"]
         expires_in = data.get("expires_in", 3600)
-        self.token_expires_at = datetime.now(timezone.utc)
+        self.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
         return self.access_token
 
@@ -67,14 +68,24 @@ class RESOClient:
         response.raise_for_status()
         return response.json()
 
+    @staticmethod
+    def _escape_odata_string(value: str) -> str:
+        """Escape single quotes for OData string literals."""
+        return value.replace("'", "''")
+
     async def get_media(self, resource_key: str) -> dict:
         """Get media (photos) for a listing."""
         await self._ensure_authenticated()
 
+        # Validate resource_key format (alphanumeric + hyphens only)
+        if not re.match(r"^[A-Za-z0-9\-_]+$", resource_key):
+            raise ValueError(f"Invalid resource key format: {resource_key}")
+
+        safe_key = self._escape_odata_string(resource_key)
         response = await self._client.get(
             f"{self.base_url}/trestle/odata/Media",
             params={
-                "$filter": f"ResourceRecordKey eq '{resource_key}'",
+                "$filter": f"ResourceRecordKey eq '{safe_key}'",
                 "$orderby": "Order",
             },
             headers={"Authorization": f"Bearer {self.access_token}"},

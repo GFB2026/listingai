@@ -18,7 +18,7 @@ class ContentVersion(Base):
     )
     version = Column(Integer, nullable=False)
     body = Column(Text, nullable=False)
-    metadata = Column(JSONB, default=dict)
+    content_metadata = Column("metadata", JSONB, default=dict)
     edited_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(
         DateTime(timezone=True),

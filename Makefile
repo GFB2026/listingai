@@ -1,20 +1,50 @@
-.PHONY: help up down build migrate test lint fmt backend frontend worker shell db-shell
+.PHONY: help up down build migrate test lint fmt backend frontend worker shell db-shell prod-up prod-down prod-build prod-logs staging-up staging-down staging-build load-test
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Docker
-up: ## Start all services
-	docker compose -f docker/docker-compose.yml --env-file .env.example up -d
+# Docker (dev)
+up: ## Start all services (dev)
+	docker compose -f docker/docker-compose.yml --env-file .env up -d
 
 down: ## Stop all services
 	docker compose -f docker/docker-compose.yml down
 
 build: ## Build all Docker images
-	docker compose -f docker/docker-compose.yml --env-file .env.example build
+	docker compose -f docker/docker-compose.yml --env-file .env build
 
 logs: ## Tail logs from all services
 	docker compose -f docker/docker-compose.yml logs -f
+
+# Docker (production)
+prod-up: ## Start production stack
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml --env-file .env up -d
+
+prod-down: ## Stop production stack
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml down
+
+prod-build: ## Build production images
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml --env-file .env build
+
+prod-logs: ## Tail production logs
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml logs -f
+
+prod-migrate: ## Run migrations in production
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml exec backend alembic upgrade head
+
+# Docker (staging)
+staging-up: ## Start staging stack
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.staging.yml --env-file .env.staging up -d
+
+staging-down: ## Stop staging stack
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.staging.yml down
+
+staging-build: ## Build staging images
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.staging.yml --env-file .env.staging build
+
+# Load testing
+load-test: ## Run k6 smoke test (use PROFILE=load|stress for heavier tests)
+	k6 run -e PROFILE=$(or $(PROFILE),smoke) tests/load/k6-smoke.js
 
 # Database
 migrate: ## Run Alembic migrations

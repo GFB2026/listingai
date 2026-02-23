@@ -39,6 +39,31 @@ class MediaService:
             "size": len(contents),
         }
 
+    async def upload_validated(self, contents: bytes, filename: str, content_type: str, tenant_id: str) -> dict:
+        """Upload pre-validated file contents to S3."""
+        ext_map = {
+            "image/jpeg": "jpg",
+            "image/png": "png",
+            "image/webp": "webp",
+            "application/pdf": "pdf",
+        }
+        ext = ext_map.get(content_type, "bin")
+        key = f"{tenant_id}/{filename}.{ext}"
+
+        self.s3.put_object(
+            Bucket=self.bucket,
+            Key=key,
+            Body=contents,
+            ContentType=content_type,
+        )
+
+        return {
+            "media_id": filename,
+            "key": key,
+            "content_type": content_type,
+            "size": len(contents),
+        }
+
     async def get_presigned_url(self, media_id: str, tenant_id: str) -> dict:
         # List objects with prefix to find the file
         prefix = f"{tenant_id}/{media_id}"
@@ -56,13 +81,31 @@ class MediaService:
 
         return {"url": url, "media_id": media_id, "key": key}
 
+    _MAX_DOWNLOAD_SIZE = 20 * 1024 * 1024  # 20 MB
+
     async def download_from_url(self, url: str, tenant_id: str, filename: str) -> dict:
         """Download a file from URL and store in S3 (used for MLS photo sync)."""
         import httpx
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("GET", url) as response:
+                response.raise_for_status()
+
+                content_length = response.headers.get("content-length")
+                if content_length and int(content_length) > self._MAX_DOWNLOAD_SIZE:
+                    raise ValueError(f"File too large: {content_length} bytes")
+
+                chunks = []
+                total = 0
+                async for chunk in response.aiter_bytes(8192):
+                    total += len(chunk)
+                    if total > self._MAX_DOWNLOAD_SIZE:
+                        raise ValueError(f"File exceeds {self._MAX_DOWNLOAD_SIZE} byte limit")
+                    chunks.append(chunk)
+
+                content = b"".join(chunks)
+                content_type = response.headers.get("content-type", "image/jpeg")
 
         file_id = str(uuid.uuid4())
         ext = filename.split(".")[-1] if filename else "jpg"
@@ -71,8 +114,8 @@ class MediaService:
         self.s3.put_object(
             Bucket=self.bucket,
             Key=key,
-            Body=response.content,
-            ContentType=response.headers.get("content-type", "image/jpeg"),
+            Body=content,
+            ContentType=content_type,
         )
 
         return {"media_id": file_id, "key": key}

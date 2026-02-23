@@ -1,0 +1,101 @@
+# Staging overlay — use with:
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.staging.yml --env-file .env.staging up -d
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+services:
+  postgres:
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U listingai"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+
+  redis:
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+
+  minio:
+    restart: unless-stopped
+    logging: *default-logging
+
+  backend:
+    restart: unless-stopped
+    env_file: ../.env.staging
+    volumes: []
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+        reservations:
+          memory: 128m
+    logging: *default-logging
+
+  worker:
+    restart: unless-stopped
+    env_file: ../.env.staging
+    volumes: []
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "0.5"
+        reservations:
+          memory: 256m
+    logging: *default-logging
+
+  beat:
+    restart: unless-stopped
+    env_file: ../.env.staging
+    volumes: []
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
+        reservations:
+          memory: 64m
+    logging: *default-logging
+
+  frontend:
+    restart: unless-stopped
+    volumes: []
+    command: ["node", "server.js"]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
+        reservations:
+          memory: 64m
+    logging: *default-logging
+
+  # No nginx/TLS in staging — access services directly or use a simple reverse proxy
+  # No backup container — staging data is ephemeral
+  # No monitoring stack — use production Grafana to monitor staging if needed

@@ -1,22 +1,25 @@
 import io
+from html import escape as html_escape
 
 from fastapi.responses import StreamingResponse
 
 from app.models.content import Content
 
+_ALLOWED_FORMATS = {"txt", "html", "docx", "pdf"}
+
 
 class ExportService:
     async def export(self, content: Content, format: str) -> StreamingResponse:
+        if format not in _ALLOWED_FORMATS:
+            raise ValueError(f"Unsupported format: {format}. Allowed: {', '.join(sorted(_ALLOWED_FORMATS))}")
         if format == "txt":
             return self._export_txt(content)
         elif format == "html":
             return self._export_html(content)
         elif format == "docx":
             return await self._export_docx(content)
-        elif format == "pdf":
-            return await self._export_pdf(content)
         else:
-            raise ValueError(f"Unsupported format: {format}")
+            return await self._export_pdf(content)
 
     def _export_txt(self, content: Content) -> StreamingResponse:
         buffer = io.BytesIO(content.body.encode("utf-8"))
@@ -27,12 +30,14 @@ class ExportService:
         )
 
     def _export_html(self, content: Content) -> StreamingResponse:
+        safe_title = html_escape(content.content_type)
+        safe_body = html_escape(content.body).replace("\n", "<br>\n")
         html = f"""<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>{content.content_type}</title></head>
+<head><meta charset="utf-8"><title>{safe_title}</title></head>
 <body>
 <div style="max-width: 800px; margin: 0 auto; font-family: Georgia, serif; padding: 2rem;">
-{content.body}
+{safe_body}
 </div>
 </body>
 </html>"""
@@ -62,7 +67,8 @@ class ExportService:
         )
 
     async def _export_pdf(self, content: Content) -> StreamingResponse:
-        # PDF export using weasyprint
+        safe_title = html_escape(content.content_type.replace("_", " ").title())
+        safe_body = html_escape(content.body).replace("\n", "<br>\n")
         html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><style>
@@ -70,8 +76,8 @@ body {{ font-family: Georgia, serif; max-width: 700px; margin: 0 auto; padding: 
 h1 {{ color: #1a365d; }}
 </style></head>
 <body>
-<h1>{content.content_type.replace("_", " ").title()}</h1>
-<div>{content.body}</div>
+<h1>{safe_title}</h1>
+<div>{safe_body}</div>
 </body>
 </html>"""
 

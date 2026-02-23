@@ -1,3 +1,4 @@
+import structlog
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -8,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.tenant import Tenant
 from app.models.usage_event import UsageEvent
+
+logger = structlog.get_logger()
 
 
 class BillingService:
@@ -56,18 +59,29 @@ class BillingService:
 
         # Create Stripe customer if needed
         if not tenant.stripe_customer_id:
-            customer = stripe.Customer.create(
-                metadata={"tenant_id": str(tenant_id), "tenant_name": tenant.name},
-            )
+            try:
+                customer = stripe.Customer.create(
+                    metadata={"tenant_id": str(tenant_id), "tenant_name": tenant.name},
+                )
+            except stripe.error.StripeError as exc:
+                await logger.aerror("stripe_customer_create_failed", tenant_id=str(tenant_id), error=str(exc))
+                raise ValueError(f"Payment provider error: {exc.user_message or 'please try again later'}") from exc
             tenant.stripe_customer_id = customer.id
             self.db.add(tenant)
             await self.db.flush()
 
         # Create subscription
-        subscription = stripe.Subscription.create(
-            customer=tenant.stripe_customer_id,
-            items=[{"price": price_id}],
-        )
+        try:
+            subscription = stripe.Subscription.create(
+                customer=tenant.stripe_customer_id,
+                items=[{"price": price_id}],
+            )
+        except stripe.error.InvalidRequestError as exc:
+            await logger.aerror("stripe_invalid_request", tenant_id=str(tenant_id), error=str(exc))
+            raise ValueError(f"Invalid subscription request: {exc.user_message or str(exc)}") from exc
+        except stripe.error.StripeError as exc:
+            await logger.aerror("stripe_subscription_create_failed", tenant_id=str(tenant_id), error=str(exc))
+            raise ValueError(f"Payment provider error: {exc.user_message or 'please try again later'}") from exc
 
         # Update tenant
         tenant.stripe_subscription_id = subscription.id

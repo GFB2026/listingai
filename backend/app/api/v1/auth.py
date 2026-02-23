@@ -1,22 +1,34 @@
 import re
+import time
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.core.login_protection import (
+    check_login_allowed,
+    clear_failed_logins,
+    record_failed_login,
+)
 from app.core.security import (
+    clear_auth_cookies,
     create_access_token,
     create_refresh_token,
     decode_token,
     hash_password,
+    set_auth_cookies,
     verify_password,
 )
+from app.core.token_blacklist import blacklist_token
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
+    MessageResponse,
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
@@ -67,15 +79,24 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         data={"sub": str(user.id), "tenant_id": str(tenant.id)}
     )
 
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    response = JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content=TokenResponse(access_token=access_token, refresh_token=refresh_token).model_dump(),
+    )
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+    # Check brute force lockout
+    await check_login_allowed(request.email)
+
     result = await db.execute(select(User).where(User.email == request.email))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(request.password, user.password_hash):
+        await record_failed_login(request.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -84,6 +105,8 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
 
+    await clear_failed_logins(request.email)
+
     access_token = create_access_token(
         data={"sub": str(user.id), "tenant_id": str(user.tenant_id), "role": user.role}
     )
@@ -91,12 +114,27 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
         data={"sub": str(user.id), "tenant_id": str(user.tenant_id)}
     )
 
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    response = JSONResponse(
+        content=TokenResponse(access_token=access_token, refresh_token=refresh_token).model_dump(),
+    )
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    payload = decode_token(request.refresh_token)
+async def refresh(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    body: Optional[RefreshRequest] = None,
+):
+    # Accept refresh token from cookie OR request body
+    token = request.cookies.get("refresh_token")
+    if not token and body:
+        token = body.refresh_token
+    if not token:
+        raise HTTPException(status_code=401, detail="No refresh token provided")
+
+    payload = decode_token(token)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
@@ -114,7 +152,38 @@ async def refresh(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
         data={"sub": str(user.id), "tenant_id": str(user.tenant_id)}
     )
 
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    response = JSONResponse(
+        content=TokenResponse(access_token=access_token, refresh_token=refresh_token).model_dump(),
+    )
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def logout(request: Request):
+    # Blacklist access token
+    access_token = request.cookies.get("access_token")
+    if access_token:
+        payload = decode_token(access_token)
+        if payload and payload.get("jti"):
+            exp = payload.get("exp", 0)
+            ttl = max(0, int(exp - time.time()))
+            if ttl > 0:
+                await blacklist_token(payload["jti"], ttl)
+
+    # Blacklist refresh token
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token:
+        payload = decode_token(refresh_token)
+        if payload and payload.get("jti"):
+            exp = payload.get("exp", 0)
+            ttl = max(0, int(exp - time.time()))
+            if ttl > 0:
+                await blacklist_token(payload["jti"], ttl)
+
+    response = JSONResponse(content={"detail": "Logged out"})
+    clear_auth_cookies(response)
+    return response
 
 
 @router.get("/me", response_model=UserResponse)

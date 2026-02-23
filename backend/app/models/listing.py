@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -14,7 +14,7 @@ class Listing(Base, TenantMixin, TimestampMixin):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     mls_connection_id = Column(UUID(as_uuid=True), ForeignKey("mls_connections.id"))
     mls_listing_id = Column(String(50))
-    status = Column(String(20))  # active, pending, sold, withdrawn
+    status = Column(String(20), server_default="active", nullable=False)  # active, pending, sold, withdrawn, expired, coming_soon
     property_type = Column(String(50))  # residential, condo, townhouse, land
     address_full = Column(String(500))
     address_street = Column(String(255))
@@ -36,7 +36,7 @@ class Listing(Base, TenantMixin, TimestampMixin):
     listing_agent_name = Column(String(255))
     listing_agent_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     raw_mls_data = Column(JSONB)
-    last_synced_at = Column(String(50))
+    last_synced_at = Column(DateTime(timezone=True))
 
     # Relationships
     tenant = relationship("Tenant", back_populates="listings")

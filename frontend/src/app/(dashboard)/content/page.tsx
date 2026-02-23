@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useContent } from "@/hooks/useContent";
+import { useContent, type ContentItem } from "@/hooks/useContent";
 import { CONTENT_TYPES } from "@/lib/utils";
 import Link from "next/link";
 
@@ -65,7 +65,7 @@ export default function ContentLibraryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {data.content.map((item: any) => (
+              {data.content.map((item: ContentItem) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {item.content_type.replace(/_/g, " ")}

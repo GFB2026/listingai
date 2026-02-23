@@ -1,17 +1,24 @@
+import re
 from uuid import UUID
 
+import redis.exceptions
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_tenant_db
+from app.core.redis import get_redis
 from app.models.listing import Listing
 from app.models.user import User
+from app.schemas.content import SyncQueueResponse
 from app.schemas.listing import (
     ListingListResponse,
     ListingManualCreate,
     ListingResponse,
 )
+
+_logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -23,8 +30,10 @@ async def list_listings(
     min_price: float | None = None,
     max_price: float | None = None,
     city: str | None = None,
+    bedrooms: int | None = None,
+    bathrooms: int | None = None,
     agent_id: str | None = None,
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=1000),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
@@ -40,7 +49,14 @@ async def list_listings(
     if max_price is not None:
         query = query.where(Listing.price <= max_price)
     if city:
+        # Sanitize: allow letters, spaces, hyphens, periods, apostrophes only
+        if not re.match(r"^[A-Za-z\s\-\.\'']+$", city):
+            raise HTTPException(status_code=400, detail="Invalid city name")
         query = query.where(Listing.address_city.ilike(f"%{city}%"))
+    if bedrooms is not None:
+        query = query.where(Listing.bedrooms >= bedrooms)
+    if bathrooms is not None:
+        query = query.where(Listing.bathrooms >= bathrooms)
     if agent_id:
         query = query.where(Listing.listing_agent_id == UUID(agent_id))
 
@@ -82,12 +98,34 @@ async def get_listing(
     return listing
 
 
-@router.post("/sync", status_code=status.HTTP_202_ACCEPTED)
+_SYNC_COOLDOWN_SECONDS = 300  # 5 minutes between syncs per tenant
+
+
+@router.post("/sync", response_model=SyncQueueResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_sync(user: User = Depends(get_current_user)):
+    import structlog.contextvars
+
     from app.workers.tasks.mls_sync import sync_mls_listings
 
-    sync_mls_listings.delay(str(user.tenant_id))
-    return {"message": "MLS sync triggered", "status": "queued"}
+    # Per-tenant throttle: 1 sync per 5 minutes
+    tenant_key = f"sync_throttle:{user.tenant_id}"
+    try:
+        r = await get_redis()
+        if await r.exists(tenant_key):
+            ttl = await r.ttl(tenant_key)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Sync already in progress or recently completed. Try again in {ttl}s.",
+            )
+        await r.setex(tenant_key, _SYNC_COOLDOWN_SECONDS, "1")
+    except (redis.exceptions.RedisError, ConnectionError, OSError):
+        await _logger.awarning("sync_throttle_redis_unavailable")
+
+    ctx = structlog.contextvars.get_contextvars()
+    correlation_id = ctx.get("request_id")
+
+    sync_mls_listings.delay(str(user.tenant_id), correlation_id=correlation_id)
+    return SyncQueueResponse(message="MLS sync triggered", status="queued")
 
 
 @router.post("/manual", response_model=ListingResponse, status_code=status.HTTP_201_CREATED)

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import axios from "axios";
 import { useAuth } from "@/lib/auth";
 
 export default function RegisterPage() {
@@ -15,6 +16,20 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const passwordErrors = (() => {
+    const p = formData.password;
+    if (!p) return [];
+    const errs: string[] = [];
+    if (p.length < 8) errs.push("At least 8 characters");
+    if (!/[A-Z]/.test(p)) errs.push("One uppercase letter");
+    if (!/[a-z]/.test(p)) errs.push("One lowercase letter");
+    if (!/\d/.test(p)) errs.push("One digit");
+    if (!/[^A-Za-z0-9]/.test(p)) errs.push("One special character");
+    return errs;
+  })();
+
+  const isPasswordValid = formData.password.length === 0 || passwordErrors.length === 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -22,8 +37,12 @@ export default function RegisterPage() {
 
     try {
       await register(formData);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Registration failed");
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err)
+          ? err.response?.data?.detail || "Registration failed"
+          : "Registration failed",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -103,11 +122,18 @@ export default function RegisterPage() {
               minLength={8}
               required
             />
+            {formData.password && passwordErrors.length > 0 && (
+              <ul className="mt-1 text-xs text-red-500">
+                {passwordErrors.map((err) => (
+                  <li key={err}>Missing: {err}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !isPasswordValid}
             className="w-full rounded-lg bg-primary px-4 py-2.5 font-medium text-white hover:bg-primary-light disabled:opacity-50"
           >
             {isLoading ? "Creating account..." : "Create Account"}
