@@ -191,6 +191,15 @@ Copy `.env.example` to `.env`. Key variables:
 - `ENCRYPTION_KEY` — Fernet key for encrypting MLS credentials at rest
 - `NEXT_PUBLIC_API_URL` — Frontend's backend URL (default `http://localhost:8000`)
 
+## Deferred Frontend Major Bumps
+
+These major-version upgrades were intentionally deferred (Dependabot PRs closed 2026-02-24). Each requires migration work:
+
+- **tailwind-merge 2→3** — changes theme scale keys, removes validators, new config format
+- **@tiptap/react + @tiptap/starter-kit 2→3** — renames API, needs `immediatelyRender: false` for SSR
+- **eslint-config-next 15→16** — requires flat config migration (`.eslintrc.json` → `eslint.config.mjs`)
+- **@sentry/nextjs 8→10** — two major jumps, API changes
+
 ## Conventions
 
 - Backend uses async/await throughout (asyncpg, httpx, async SQLAlchemy sessions)
