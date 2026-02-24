@@ -2,6 +2,50 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.0] - 2026-02-24
+
+Lead tracking and agent landing pages release.
+
+### Added
+- **Agent Pages** — public landing pages per agent with custom slug, headline, bio, photo, and theme
+- **Lead Capture** — public form submission with UTM attribution, session tracking, and IP/user-agent capture
+- **Lead Pipeline** — full CRUD with pipeline statuses (new → contacted → showing → under_contract → closed/lost)
+- **Lead Activities** — timeline of notes, status changes, and interactions per lead
+- **Lead Analytics** — summary by status/source/agent, pipeline funnel with conversion rates, total closed value
+- **Visit Tracking** — anonymous page visit recording with UTM and referrer attribution
+- **Public API** — unauthenticated endpoints for landing pages, lead submission, visit tracking, and link config
+- **Kanban Board UI** — drag-and-drop lead pipeline board on the dashboard
+- **Lead Detail Panel** — full lead view with contact info, attribution, and activity timeline
+- **Analytics Charts** — source breakdown, funnel visualization, agent leaderboard
+- **Agent Hero & Property Hero** — public-facing agent profile and listing detail components
+- **Lead Capture Form** — public form with validation, UTM/session capture, and success state
+- 61 new backend tests across 3 new test files (test_agent_pages_api, test_leads_api, test_public_api)
+- 24 new frontend tests across 3 new test files (useLeads, useAgentPages, useLeadAnalytics)
+- New hooks: `useLeads`, `useAgentPages`, `useLeadAnalytics` with full mutation support and toast notifications
+- Public Axios instance (`public-api.ts`) for unauthenticated API calls
+- UTM parameter capture utility (`utm.ts`) with session storage
+
+### Fixed
+- asyncpg type inference for `func.coalesce` with string literals in analytics queries (use `literal("direct", String)`)
+- Production Docker health checks: `localhost` → `127.0.0.1` for frontend wget, `/health/ready` → `/health/live` for backend liveness
+
+### Changed
+- Backend test count: 312 → 373 (35 test files)
+- Frontend test count: 119 → 143 (22 test files)
+- CSRF middleware exempts `/api/v1/public/` prefix
+- Rate limiter adds public endpoint limits (leads: 10/min, visits: 30/min, general public: 60/min)
+- Sidebar updated with Leads, Lead Analytics, and Agent Pages navigation
+- Dashboard page includes lead stats and quick actions
+- Migration chain extended: `d4e5f6a7b8c9` → `e5f6a7b8c9d0` (lead tracking tables with RLS)
+- Version bumped to 1.4.0
+
+### Database
+- New tables: `agent_pages`, `leads`, `lead_activities`, `page_visits`
+- RLS policies on all new tenant-scoped tables
+- Indexes: tenant+agent, tenant+status, tenant+created_at on leads; agent+created_at on page_visits
+- Unique constraints: tenant+slug and tenant+user on agent_pages
+- Foreign keys with appropriate CASCADE/SET NULL on delete
+
 ## [1.3.0] - 2026-02-23
 
 Near-complete coverage release — 97% backend test coverage.
