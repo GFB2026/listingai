@@ -11,7 +11,7 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 ## Tech Stack
 
 - **Backend:** Python 3.12, FastAPI 0.133, SQLAlchemy 2.0.46 (async), Celery 5.6, Redis 7, PostgreSQL 16
-- **Frontend:** Next.js 15 (App Router), React 19, TypeScript 5.7, TailwindCSS 4, React Query 5, Zustand
+- **Frontend:** Next.js 15 (App Router), React 19, TypeScript 5.9, TailwindCSS 4, React Query 5, Zustand
 - **Infrastructure:** Docker Compose, MinIO (S3-compatible), Alembic migrations
 - **AI:** Anthropic SDK (Sonnet 4.5 for most content, Haiku 4.5 for short-form like tweets)
 
