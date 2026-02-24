@@ -10,7 +10,7 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 
 ## Tech Stack
 
-- **Backend:** Python 3.12, FastAPI 0.133, SQLAlchemy 2 (async), Celery 5, Redis 7, PostgreSQL 16
+- **Backend:** Python 3.12, FastAPI 0.133, SQLAlchemy 2.0.46 (async), Celery 5.6, Redis 7, PostgreSQL 16
 - **Frontend:** Next.js 15 (App Router), React 19, TypeScript 5.7, TailwindCSS 4, React Query 5, Zustand
 - **Infrastructure:** Docker Compose, MinIO (S3-compatible), Alembic migrations
 - **AI:** Anthropic SDK (Sonnet 4.5 for most content, Haiku 4.5 for short-form like tweets)
@@ -18,7 +18,7 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 ## Testing
 
 ### Backend
-- **304 tests** across 31 test files, all passing
+- **306 tests** across 31 test files, all passing
 - **97% code coverage** (2302/2367 statements) — CI gate is 60%
 - Tests use mocked external services (no real API keys, Stripe, S3, or MLS calls)
 - `asyncio_mode = "auto"` with `asyncio_default_fixture_loop_scope = "function"` — async tests auto-detected
