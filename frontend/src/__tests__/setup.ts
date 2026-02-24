@@ -37,7 +37,7 @@ vi.mock("next/link", async () => {
   return {
     default: (props: Record<string, unknown>) => {
       const { children, ...rest } = props;
-      return React.createElement("a", rest, children);
+      return React.createElement("a", rest, children as React.ReactNode);
     },
   };
 });
