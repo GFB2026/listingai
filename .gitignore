@@ -43,6 +43,9 @@ Thumbs.db
 # Celery
 celerybeat-schedule
 
+# Linting
+.ruff_cache/
+
 # Testing
 htmlcov/
 .coverage

@@ -2,13 +2,16 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     admin,
+    agent_pages,
     auth,
     billing,
     brand_profiles,
     content,
+    leads,
     listings,
     media,
     mls_connections,
+    public,
     tenants,
     users,
     webhooks,
@@ -29,3 +32,8 @@ api_router.include_router(
     mls_connections.router, prefix="/mls-connections", tags=["MLS Connections"]
 )
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
+api_router.include_router(leads.router, prefix="/leads", tags=["Leads"])
+api_router.include_router(
+    agent_pages.router, prefix="/agent-pages", tags=["Agent Pages"]
+)
+api_router.include_router(public.router, prefix="/public", tags=["Public"])

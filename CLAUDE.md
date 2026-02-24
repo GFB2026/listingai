@@ -19,10 +19,11 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 
 ### Backend
 - **312 tests** across 32 test files, all passing
-- **97% code coverage** (2302/2367 statements) — CI gate is 60%
+- **87% code coverage** (2676/3081 statements) — CI gate is 60%
 - Tests use mocked external services (no real API keys, Stripe, S3, or MLS calls)
 - `asyncio_mode = "auto"` with `asyncio_default_fixture_loop_scope = "function"` — async tests auto-detected
 - Coverage report: `cd backend && pytest --cov=app --cov-report=term-missing`
+- **Test fixture pattern** (`conftest.py`): `db_session` is function-scoped, creates its own engine per test. A module-level `_tables_created` flag ensures DDL (`drop_all`/`create_all`) runs only once; subsequent tests use `TRUNCATE CASCADE` for fast cleanup. Engine is disposed after each test. This avoids cross-event-loop asyncpg deadlocks that occur when a session-scoped engine shares connections across function-scoped event loops (especially under coverage with greenlet+thread concurrency)
 
 ### Frontend
 - **119 tests** across 19 test files (Vitest + React Testing Library + MSW)

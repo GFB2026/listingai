@@ -33,6 +33,24 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: leadsData } = useQuery({
+    queryKey: ["leads", "count"],
+    queryFn: async () => {
+      const res = await api.get("/leads", { params: { page_size: 1 } });
+      return res.data;
+    },
+  });
+
+  const { data: newLeadsData } = useQuery({
+    queryKey: ["leads", "new-count"],
+    queryFn: async () => {
+      const res = await api.get("/leads", {
+        params: { pipeline_status: "new", page_size: 1 },
+      });
+      return res.data;
+    },
+  });
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-gray-900">
@@ -40,7 +58,7 @@ export default function DashboardPage() {
       </h1>
 
       {/* Stats Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Generations This Month"
           value={usage?.credits_used ?? "—"}
@@ -61,6 +79,16 @@ export default function DashboardPage() {
           value={recentContent?.total ?? "—"}
           sub="all time"
         />
+        <StatCard
+          label="Total Leads"
+          value={leadsData?.total ?? "—"}
+          sub="all time"
+        />
+        <StatCard
+          label="New Leads"
+          value={newLeadsData?.total ?? "—"}
+          sub="awaiting contact"
+        />
       </div>
 
       {/* Quick Actions */}
@@ -80,6 +108,12 @@ export default function DashboardPage() {
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Content Library
+          </Link>
+          <Link
+            href="/leads"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Lead Pipeline
           </Link>
           <Link
             href="/brand"

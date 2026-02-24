@@ -23,6 +23,7 @@ class User(Base, TenantMixin, TimestampMixin):
     # Relationships
     tenant = relationship("Tenant", back_populates="users")
     content = relationship("Content", back_populates="user")
+    agent_page = relationship("AgentPage", back_populates="user", uselist=False)
 
     __table_args__ = (
         {"schema": None},

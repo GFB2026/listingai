@@ -30,3 +30,7 @@ class Tenant(Base, TimestampMixin):
         "MLSConnection", back_populates="tenant", cascade="all, delete-orphan",
     )
     content = relationship("Content", back_populates="tenant", cascade="all, delete-orphan")
+    agent_pages = relationship(
+        "AgentPage", back_populates="tenant", cascade="all, delete-orphan",
+    )
+    leads = relationship("Lead", back_populates="tenant", cascade="all, delete-orphan")

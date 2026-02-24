@@ -25,11 +25,14 @@ PATH_LIMITS = {
     "/api/v1/admin/stats": (30, 60),
     "/api/v1/content/generate": (5, 60),    # expensive Claude API calls
     "/api/v1/content/batch": (2, 300),      # batch jobs — max 2 per 5 min
+    "/api/v1/public/leads": (10, 60),       # public lead submissions
+    "/api/v1/public/visits": (30, 60),      # page visit tracking
 }
 
 # Prefix-based limits for route groups: (prefix, max_requests, window_seconds)
 PREFIX_LIMITS = [
     ("/api/v1/admin/", 30, 60),
+    ("/api/v1/public/", 60, 60),
 ]
 
 # Default limits

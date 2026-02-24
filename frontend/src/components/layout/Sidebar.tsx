@@ -9,9 +9,12 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: "H" },
   { href: "/listings", label: "Listings", icon: "L" },
   { href: "/content", label: "Content", icon: "C" },
+  { href: "/leads", label: "Leads", icon: "T" },
+  { href: "/leads/analytics", label: "Analytics", icon: "A" },
   { href: "/brand", label: "Brand", icon: "B" },
   { href: "/settings", label: "Settings", icon: "S" },
   { href: "/settings/mls", label: "MLS", icon: "M" },
+  { href: "/settings/agent-pages", label: "Agent Pages", icon: "P" },
   { href: "/billing", label: "Billing", icon: "$" },
 ];
 
@@ -37,7 +40,14 @@ export function Sidebar() {
           const isActive =
             item.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href);
+              : pathname === item.href ||
+                (pathname.startsWith(item.href + "/") &&
+                  !navItems.some(
+                    (other) =>
+                      other.href !== item.href &&
+                      other.href.startsWith(item.href + "/") &&
+                      pathname.startsWith(other.href)
+                  ));
 
           return (
             <Link

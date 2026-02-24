@@ -27,6 +27,11 @@ CSRF_EXEMPT_PATHS = {
     "/metrics",
 }
 
+# Prefix-based exemptions (public endpoints don't use cookie auth)
+CSRF_EXEMPT_PREFIXES = (
+    "/api/v1/public/",
+)
+
 STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -40,6 +45,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         # Skip exempt paths
         if request.url.path in CSRF_EXEMPT_PATHS:
+            return await call_next(request)
+
+        # Skip exempt prefixes (public API)
+        if any(request.url.path.startswith(p) for p in CSRF_EXEMPT_PREFIXES):
             return await call_next(request)
 
         # Only enforce if request uses cookie auth (has access_token cookie)
