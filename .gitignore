@@ -50,6 +50,7 @@ celerybeat-schedule
 htmlcov/
 .coverage
 .pytest_cache/
+frontend/coverage/
 
 # Docker
 docker/volumes/
