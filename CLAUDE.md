@@ -26,8 +26,9 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 - **Test fixture pattern** (`conftest.py`): `db_session` is function-scoped, creates its own engine per test. A module-level `_tables_created` flag ensures DDL (`drop_all`/`create_all`) runs only once; subsequent tests use `TRUNCATE CASCADE` for fast cleanup. Engine is disposed after each test. This avoids cross-event-loop asyncpg deadlocks that occur when a session-scoped engine shares connections across function-scoped event loops (especially under coverage with greenlet+thread concurrency)
 
 ### Frontend
-- **143 tests** across 22 test files (Vitest + React Testing Library + MSW)
-- Tests cover hooks, components, API client, auth context, and utilities
+- **218 tests** across 32 test files (Vitest + React Testing Library + MSW)
+- **76% statement coverage** — thresholds: 70% for `src/lib/**` and `src/hooks/**`
+- Tests cover hooks, components, API client, auth context, utilities, and lead tracking UI
 
 ### Docker Tests
 - `make docker-test` runs the full backend suite inside Docker (postgres + redis)
