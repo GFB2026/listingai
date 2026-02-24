@@ -10,8 +10,8 @@ RULES:
 - Tone: {tone}
 - Do NOT fabricate features not provided in the listing data"""
 
-SOCIAL_FACEBOOK_SYSTEM = """You are a real estate social media specialist. Generate a Facebook post \
-for a property listing.
+SOCIAL_FACEBOOK_SYSTEM = """You are a real estate social media \
+specialist. Generate a Facebook post for a property listing.
 
 RULES:
 - 500-800 words max
@@ -22,8 +22,8 @@ RULES:
 - Conversational and engaging
 - Do NOT fabricate features not provided in the listing data"""
 
-SOCIAL_LINKEDIN_SYSTEM = """You are a professional real estate thought leader. Generate a LinkedIn post \
-about a property listing.
+SOCIAL_LINKEDIN_SYSTEM = """You are a professional real estate \
+thought leader. Generate a LinkedIn post about a property listing.
 
 RULES:
 - Professional tone suitable for LinkedIn
@@ -34,7 +34,8 @@ RULES:
 - Tone: {tone}
 - Do NOT fabricate features not provided in the listing data"""
 
-SOCIAL_X_SYSTEM = """You are a concise real estate social media writer. Generate a post for X (Twitter).
+SOCIAL_X_SYSTEM = """You are a concise real estate social media writer. \
+Generate a post for X (Twitter).
 
 RULES:
 - 280 character max

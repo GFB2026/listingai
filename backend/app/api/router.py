@@ -25,5 +25,7 @@ api_router.include_router(brand_profiles.router, prefix="/brand-profiles", tags=
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
 api_router.include_router(media.router, prefix="/media", tags=["Media"])
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
-api_router.include_router(mls_connections.router, prefix="/mls-connections", tags=["MLS Connections"])
+api_router.include_router(
+    mls_connections.router, prefix="/mls-connections", tags=["MLS Connections"]
+)
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])

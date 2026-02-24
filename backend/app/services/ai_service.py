@@ -44,7 +44,7 @@ FAILURE_THRESHOLD = 5
 RECOVERY_TIMEOUT = 60  # seconds
 
 
-class CircuitBreakerOpen(Exception):
+class CircuitBreakerOpenError(Exception):
     """Raised when the Claude API circuit breaker is open."""
 
     def __init__(self):
@@ -132,7 +132,7 @@ class AIService:
             result = await db.execute(
                 select(BrandProfile).where(
                     BrandProfile.tenant_id == UUID(tenant_id),
-                    BrandProfile.is_default == True,
+                    BrandProfile.is_default.is_(True),
                 )
             )
             brand_profile = result.scalar_one_or_none()
@@ -151,7 +151,7 @@ class AIService:
 
         # Circuit breaker check
         if not _circuit.allow_request():
-            raise CircuitBreakerOpen()
+            raise CircuitBreakerOpenError()
 
         # Call Claude API with timeout and circuit breaker
         try:
@@ -162,7 +162,11 @@ class AIService:
                 messages=[{"role": "user", "content": user_prompt}],
             )
             _circuit.record_success()
-        except (anthropic.APIConnectionError, anthropic.APITimeoutError, httpx.TimeoutException) as exc:
+        except (
+            anthropic.APIConnectionError,
+            anthropic.APITimeoutError,
+            httpx.TimeoutException,
+        ) as exc:
             _circuit.record_failure()
             await logger.aerror("claude_api_error", error=str(exc), model=model, exc_info=True)
             raise

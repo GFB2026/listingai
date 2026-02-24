@@ -19,7 +19,8 @@ class Content(Base, TenantMixin, TimestampMixin):
     tone = Column(String(30))
     body = Column(Text, nullable=False)
     content_metadata = Column("metadata", JSONB, default=dict)
-    status = Column(String(20), server_default="draft", nullable=False)  # draft, approved, published, archived
+    # draft, approved, published, archived
+    status = Column(String(20), server_default="draft", nullable=False)
     ai_model = Column(String(50))
     prompt_tokens = Column(Integer)
     completion_tokens = Column(Integer)
@@ -31,4 +32,6 @@ class Content(Base, TenantMixin, TimestampMixin):
     listing = relationship("Listing", back_populates="content")
     user = relationship("User", back_populates="content")
     brand_profile = relationship("BrandProfile", back_populates="content")
-    versions = relationship("ContentVersion", back_populates="content", cascade="all, delete-orphan")
+    versions = relationship(
+        "ContentVersion", back_populates="content", cascade="all, delete-orphan",
+    )

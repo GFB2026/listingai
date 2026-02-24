@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from app.core.security import create_access_token
 from app.models.tenant import Tenant
 from app.models.user import User
-from app.services.ai_service import CircuitBreakerOpen
+from app.services.ai_service import CircuitBreakerOpenError
 
 
 class TestHealthChecks:
@@ -117,13 +117,13 @@ class TestExceptionHandlers:
     async def test_circuit_breaker_exception_returns_503(
         self, client: AsyncClient, test_user: User, test_tenant: Tenant, test_listing
     ):
-        """CircuitBreakerOpen exception should return 503."""
+        """CircuitBreakerOpenError exception should return 503."""
         token = create_access_token(
             data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id), "role": "admin"}
         )
 
         mock_ai = MagicMock()
-        mock_ai.generate = AsyncMock(side_effect=CircuitBreakerOpen())
+        mock_ai.generate = AsyncMock(side_effect=CircuitBreakerOpenError())
 
         with patch("app.api.v1.content.AIService", return_value=mock_ai):
             response = await client.post(

@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_tenant_db
-from app.core.encryption import decrypt_value, encrypt_value
+from app.core.encryption import encrypt_value
 from app.integrations.mls.reso_client import RESOClient
 from app.models.listing import Listing
 from app.models.mls_connection import MLSConnection

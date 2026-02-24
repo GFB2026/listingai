@@ -14,7 +14,8 @@ class Listing(Base, TenantMixin, TimestampMixin):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     mls_connection_id = Column(UUID(as_uuid=True), ForeignKey("mls_connections.id"))
     mls_listing_id = Column(String(50))
-    status = Column(String(20), server_default="active", nullable=False)  # active, pending, sold, withdrawn, expired, coming_soon
+    # active, pending, sold, withdrawn, expired, coming_soon
+    status = Column(String(20), server_default="active", nullable=False)
     property_type = Column(String(50))  # residential, condo, townhouse, land
     address_full = Column(String(500))
     address_street = Column(String(255))

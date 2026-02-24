@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from contextlib import asynccontextmanager
 
 import sentry_sdk
@@ -10,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.config import get_settings
 from app.api.router import api_router
+from app.config import get_settings
 from app.core.logging_config import configure_logging
 from app.middleware.csrf import CSRFMiddleware
 from app.middleware.rate_limiter import RateLimitMiddleware
@@ -24,7 +23,7 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    settings = get_settings()
+    get_settings()
     from app.core.database import engine
     from app.core.redis import redis_pool
 
@@ -65,8 +64,14 @@ def create_app() -> FastAPI:
         allow_origins=[settings.frontend_url],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "X-Request-ID", "X-CSRF-Token"],
-        expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"],
+        allow_headers=[
+            "Authorization", "Content-Type", "Accept", "Origin",
+            "X-Requested-With", "X-Request-ID", "X-CSRF-Token",
+        ],
+        expose_headers=[
+            "X-Request-ID", "X-RateLimit-Limit",
+            "X-RateLimit-Remaining", "Retry-After",
+        ],
     )
 
     # Middleware stack (order matters — outermost first)
@@ -91,8 +96,9 @@ def create_app() -> FastAPI:
 
         # Check PostgreSQL
         try:
-            from app.core.database import engine
             from sqlalchemy import text
+
+            from app.core.database import engine
             async with asyncio.timeout(5):
                 async with engine.connect() as conn:
                     await conn.execute(text("SELECT 1"))
@@ -145,7 +151,7 @@ def create_app() -> FastAPI:
     @app.get("/metrics")
     async def metrics():
         """Prometheus metrics endpoint."""
-        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
         from starlette.responses import Response as StarletteResponse
         return StarletteResponse(
             content=generate_latest(),
@@ -154,10 +160,10 @@ def create_app() -> FastAPI:
 
     # --- Exception handlers ---
 
-    from app.services.ai_service import CircuitBreakerOpen
+    from app.services.ai_service import CircuitBreakerOpenError
 
-    @app.exception_handler(CircuitBreakerOpen)
-    async def circuit_breaker_handler(request: Request, exc: CircuitBreakerOpen):
+    @app.exception_handler(CircuitBreakerOpenError)
+    async def circuit_breaker_handler(request: Request, exc: CircuitBreakerOpenError):
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={

@@ -24,7 +24,13 @@ logger = structlog.get_logger()
     soft_time_limit=180,
     time_limit=240,
 )
-def download_listing_photos(self, tenant_id: str, listing_id: str, photo_urls: list[dict], correlation_id: str | None = None):
+def download_listing_photos(
+    self,
+    tenant_id: str,
+    listing_id: str,
+    photo_urls: list[dict],
+    correlation_id: str | None = None,
+):
     """Download and store listing photos from MLS."""
     if correlation_id:
         structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
@@ -44,7 +50,7 @@ def download_listing_photos(self, tenant_id: str, listing_id: str, photo_urls: l
             listing_id=listing_id,
             error=str(exc),
         )
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 async def _download_photos(tenant_id: str, listing_id: str, photo_urls: list[dict]):

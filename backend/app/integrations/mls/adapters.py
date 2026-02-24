@@ -1,3 +1,4 @@
+import contextlib
 from datetime import date
 
 
@@ -43,10 +44,8 @@ class PropertyAdapter:
         # Parse list date
         list_date = None
         if reso_data.get("ListingContractDate"):
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 list_date = date.fromisoformat(reso_data["ListingContractDate"][:10])
-            except (ValueError, TypeError):
-                pass
 
         return {
             "mls_listing_id": reso_data.get("ListingKey") or reso_data.get("ListingId"),

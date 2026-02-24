@@ -42,7 +42,9 @@ async def _update_tenant_plan(
     )
     tenant = result.scalar_one_or_none()
     if not tenant:
-        await logger.awarning("stripe_webhook_tenant_not_found", stripe_customer_id=stripe_customer_id)
+        await logger.awarning(
+            "stripe_webhook_tenant_not_found", stripe_customer_id=stripe_customer_id
+        )
         return
 
     if stripe_subscription_id is not None:
@@ -80,10 +82,10 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.stripe_webhook_secret
         )
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid payload") from exc
+    except stripe.error.SignatureVerificationError as exc:
+        raise HTTPException(status_code=400, detail="Invalid signature") from exc
 
     event_type = event["type"]
     event_id = event["id"]

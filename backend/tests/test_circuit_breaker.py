@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from app.services.ai_service import (
-    CircuitBreakerOpen,
+    CircuitBreakerOpenError,
     _CircuitBreaker,
 )
 
@@ -60,5 +60,5 @@ class TestCircuitBreaker:
         assert cb.allow_request() is False  # reopened, recovery not yet elapsed
 
     def test_circuit_breaker_open_exception(self):
-        exc = CircuitBreakerOpen()
+        exc = CircuitBreakerOpenError()
         assert "temporarily unavailable" in str(exc)

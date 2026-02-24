@@ -45,7 +45,7 @@ def batch_generate_content(
         raise
     except Exception as exc:
         logger.error("batch_generate_error", tenant_id=tenant_id, error=str(exc))
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 async def _batch_generate(

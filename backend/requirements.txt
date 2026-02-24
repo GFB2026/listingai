@@ -1,7 +1,7 @@
 # FastAPI
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
-python-multipart==0.0.18
+python-multipart==0.0.22
 
 # Database
 sqlalchemy[asyncio]==2.0.36
@@ -16,7 +16,7 @@ redis==5.2.1
 celery[redis]==5.4.0
 
 # Auth
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.2.1
 
@@ -35,14 +35,14 @@ stripe==11.3.0
 boto3==1.35.81
 
 # Encryption
-cryptography==44.0.0
+cryptography==46.0.5
 
 # HTTP Client
 httpx==0.28.1
 
 # Export
 python-docx==1.1.2
-weasyprint==63.1
+weasyprint==68.0
 
 # Observability
 sentry-sdk[fastapi,celery]==2.19.2

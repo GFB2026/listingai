@@ -189,8 +189,8 @@ class TestAIService:
 
     @pytest.mark.asyncio
     async def test_generate_circuit_breaker_blocks_when_open(self):
-        """When the circuit breaker is open, generate should raise CircuitBreakerOpen."""
-        from app.services.ai_service import AIService, CircuitBreakerOpen, _CircuitBreaker
+        """When the circuit breaker is open, generate should raise CircuitBreakerOpenError."""
+        from app.services.ai_service import AIService, CircuitBreakerOpenError, _CircuitBreaker
         from app.services import ai_service
 
         # Force circuit open
@@ -208,7 +208,7 @@ class TestAIService:
             service.prompt_builder.build = MagicMock(return_value=("system", "user"))
             service.client = AsyncMock()
 
-            with pytest.raises(CircuitBreakerOpen):
+            with pytest.raises(CircuitBreakerOpenError):
                 await service.generate(
                     listing=listing,
                     content_type="listing_description",

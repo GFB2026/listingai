@@ -73,7 +73,7 @@ async def list_listings(
     listings = result.scalars().all()
 
     return ListingListResponse(
-        listings=[ListingResponse.model_validate(l) for l in listings],
+        listings=[ListingResponse.model_validate(item) for item in listings],
         total=total,
         page=page,
         page_size=page_size,

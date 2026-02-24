@@ -17,7 +17,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
 
         if settings.app_env == "production":
-            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=63072000; includeSubDomains; preload"
+            )
 
         # Swagger UI needs unsafe-inline; API endpoints get strict CSP
         if request.url.path in ("/docs", "/redoc", "/openapi.json"):

@@ -1,5 +1,6 @@
-LISTING_DESCRIPTION_SYSTEM = """You are an expert real estate copywriter specializing in South Florida \
-coastal and luxury properties. Generate a compelling MLS listing description.
+LISTING_DESCRIPTION_SYSTEM = """You are an expert real estate \
+copywriter specializing in South Florida coastal and luxury properties. \
+Generate a compelling MLS listing description.
 
 RULES:
 - Write in third person

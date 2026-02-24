@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -100,7 +100,7 @@ class SyncEngine:
             # Update watermark
             if latest_timestamp:
                 connection.sync_watermark = latest_timestamp
-            connection.last_sync_at = datetime.now(timezone.utc)
+            connection.last_sync_at = datetime.now(UTC)
             self.db.add(connection)
 
         finally:
@@ -116,7 +116,7 @@ class SyncEngine:
         result = await self.db.execute(
             select(MLSConnection).where(
                 MLSConnection.tenant_id == UUID(tenant_id),
-                MLSConnection.sync_enabled == True,
+                MLSConnection.sync_enabled.is_(True),
             )
         )
         connections = result.scalars().all()

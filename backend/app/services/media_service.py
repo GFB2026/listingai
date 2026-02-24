@@ -39,7 +39,10 @@ class MediaService:
             "size": len(contents),
         }
 
-    async def upload_validated(self, contents: bytes, filename: str, content_type: str, tenant_id: str) -> dict:
+    async def upload_validated(
+        self, contents: bytes, filename: str,
+        content_type: str, tenant_id: str,
+    ) -> dict:
         """Upload pre-validated file contents to S3."""
         ext_map = {
             "image/jpeg": "jpg",
@@ -88,8 +91,10 @@ class MediaService:
         import httpx
 
         timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            async with client.stream("GET", url) as response:
+        async with (
+            httpx.AsyncClient(timeout=timeout) as client,
+            client.stream("GET", url) as response,
+        ):
                 response.raise_for_status()
 
                 content_length = response.headers.get("content-length")

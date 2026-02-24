@@ -1,7 +1,6 @@
 import uuid
-from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -24,6 +23,10 @@ class Tenant(Base, TimestampMixin):
     # Relationships
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     listings = relationship("Listing", back_populates="tenant", cascade="all, delete-orphan")
-    brand_profiles = relationship("BrandProfile", back_populates="tenant", cascade="all, delete-orphan")
-    mls_connections = relationship("MLSConnection", back_populates="tenant", cascade="all, delete-orphan")
+    brand_profiles = relationship(
+        "BrandProfile", back_populates="tenant", cascade="all, delete-orphan",
+    )
+    mls_connections = relationship(
+        "MLSConnection", back_populates="tenant", cascade="all, delete-orphan",
+    )
     content = relationship("Content", back_populates="tenant", cascade="all, delete-orphan")

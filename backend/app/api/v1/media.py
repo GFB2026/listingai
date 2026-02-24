@@ -1,7 +1,7 @@
 import uuid
 
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 from app.api.deps import get_current_user
 from app.config import get_settings
@@ -48,9 +48,7 @@ def _validate_magic_bytes(content_type: str, data: bytes) -> bool:
     for sig in signatures:
         if data[:len(sig)] == sig:
             # Extra check for WebP: bytes 8-12 must be "WEBP"
-            if content_type == "image/webp" and data[8:12] != b"WEBP":
-                return False
-            return True
+            return not (content_type == "image/webp" and data[8:12] != b"WEBP")
     return False
 
 
@@ -65,12 +63,19 @@ async def upload_media(
     # Check file size
     max_size = get_settings().max_upload_file_size
     if len(contents) > max_size:
-        raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {max_size // (1024 * 1024)}MB.")
+        max_mb = max_size // (1024 * 1024)
+        raise HTTPException(
+            status_code=400, detail=f"File too large. Maximum size is {max_mb}MB."
+        )
 
     # Check MIME type
     content_type = file.content_type or "application/octet-stream"
     if content_type not in ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=400, detail=f"File type '{content_type}' not allowed. Allowed types: {', '.join(sorted(ALLOWED_MIME_TYPES))}")
+        allowed = ", ".join(sorted(ALLOWED_MIME_TYPES))
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type '{content_type}' not allowed. Allowed types: {allowed}",
+        )
 
     # Validate magic bytes
     if not _validate_magic_bytes(content_type, contents):

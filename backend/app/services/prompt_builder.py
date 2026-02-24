@@ -1,5 +1,11 @@
 from app.models.brand_profile import BrandProfile
 from app.models.listing import Listing
+from app.prompts.email_campaign import (
+    EMAIL_DRIP_SYSTEM,
+    EMAIL_JUST_LISTED_SYSTEM,
+    EMAIL_OPEN_HOUSE_SYSTEM,
+)
+from app.prompts.flyer_copy import FLYER_SYSTEM
 from app.prompts.listing_description import LISTING_DESCRIPTION_SYSTEM
 from app.prompts.social_media import (
     SOCIAL_FACEBOOK_SYSTEM,
@@ -7,12 +13,6 @@ from app.prompts.social_media import (
     SOCIAL_LINKEDIN_SYSTEM,
     SOCIAL_X_SYSTEM,
 )
-from app.prompts.email_campaign import (
-    EMAIL_DRIP_SYSTEM,
-    EMAIL_JUST_LISTED_SYSTEM,
-    EMAIL_OPEN_HOUSE_SYSTEM,
-)
-from app.prompts.flyer_copy import FLYER_SYSTEM
 from app.prompts.video_script import VIDEO_SCRIPT_SYSTEM
 
 SYSTEM_PROMPTS = {
@@ -85,7 +85,12 @@ class PromptBuilder:
         if listing.year_built:
             parts.append(f"Year Built: {listing.year_built}")
         if listing.features:
-            parts.append(f"Key Features: {', '.join(listing.features) if isinstance(listing.features, list) else listing.features}")
+            features_str = (
+                ', '.join(listing.features)
+                if isinstance(listing.features, list)
+                else listing.features
+            )
+            parts.append(f"Key Features: {features_str}")
         if listing.description_original:
             parts.append(f"Original Description: {listing.description_original}")
         if listing.listing_agent_name:

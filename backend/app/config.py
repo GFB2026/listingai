@@ -93,7 +93,7 @@ def get_settings() -> Settings:
             errors.append("STRIPE_PUBLISHABLE_KEY must be set")
         if errors:
             raise ValueError(
-                f"Production configuration errors:\n" + "\n".join(f"  - {e}" for e in errors)
+                "Production configuration errors:\n" + "\n".join(f"  - {e}" for e in errors)
             )
     elif settings.app_env in ("development", "testing"):
         # Auto-generate ephemeral secrets for development/testing so no
@@ -105,6 +105,6 @@ def get_settings() -> Settings:
         if not settings.s3_access_key:
             settings.s3_access_key = "minioadmin"
         if not settings.s3_secret_key:
-            settings.s3_secret_key = "minioadmin"
+            settings.s3_secret_key = "minioadmin"  # noqa: S105
 
     return settings

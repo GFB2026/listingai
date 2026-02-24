@@ -30,7 +30,7 @@ def sync_mls_listings(self, tenant_id: str, correlation_id: str | None = None):
         raise
     except Exception as exc:
         logger.error("sync_mls_error", tenant_id=tenant_id, error=str(exc))
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 @celery_app.task(
@@ -54,7 +54,7 @@ def sync_all_tenants(self, correlation_id: str | None = None):
         raise
     except Exception as exc:
         logger.error("sync_all_error", error=str(exc))
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 async def _sync_tenant(tenant_id: str):
@@ -72,13 +72,12 @@ async def _sync_all():
     from sqlalchemy import select
 
     from app.core.database import async_session_factory
-    from app.integrations.mls.sync_engine import SyncEngine
     from app.models.mls_connection import MLSConnection
 
     async with async_session_factory() as session:
         result = await session.execute(
             select(MLSConnection.tenant_id)
-            .where(MLSConnection.sync_enabled == True)
+            .where(MLSConnection.sync_enabled.is_(True))
             .distinct()
         )
         tenant_ids = [str(row[0]) for row in result.all()]

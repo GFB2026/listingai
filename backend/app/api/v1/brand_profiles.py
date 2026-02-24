@@ -40,7 +40,7 @@ async def create_brand_profile(
         existing = await db.execute(
             select(BrandProfile).where(
                 BrandProfile.tenant_id == user.tenant_id,
-                BrandProfile.is_default == True,
+                BrandProfile.is_default.is_(True),
             )
         )
         for bp in existing.scalars().all():

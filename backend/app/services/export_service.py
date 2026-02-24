@@ -11,7 +11,10 @@ _ALLOWED_FORMATS = {"txt", "html", "docx", "pdf"}
 class ExportService:
     async def export(self, content: Content, format: str) -> StreamingResponse:
         if format not in _ALLOWED_FORMATS:
-            raise ValueError(f"Unsupported format: {format}. Allowed: {', '.join(sorted(_ALLOWED_FORMATS))}")
+            raise ValueError(
+                f"Unsupported format: {format}. "
+                f"Allowed: {', '.join(sorted(_ALLOWED_FORMATS))}"
+            )
         if format == "txt":
             return self._export_txt(content)
         elif format == "html":

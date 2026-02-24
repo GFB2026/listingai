@@ -1,8 +1,8 @@
-import structlog
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import stripe
+import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +20,7 @@ class BillingService:
         stripe.api_key = settings.stripe_secret_key
 
     async def get_current_usage(self, tenant_id: UUID) -> dict:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Get usage counts
@@ -64,8 +64,14 @@ class BillingService:
                     metadata={"tenant_id": str(tenant_id), "tenant_name": tenant.name},
                 )
             except stripe.error.StripeError as exc:
-                await logger.aerror("stripe_customer_create_failed", tenant_id=str(tenant_id), error=str(exc))
-                raise ValueError(f"Payment provider error: {exc.user_message or 'please try again later'}") from exc
+                await logger.aerror(
+                    "stripe_customer_create_failed",
+                    tenant_id=str(tenant_id), error=str(exc),
+                )
+                raise ValueError(
+                    f"Payment provider error: "
+                    f"{exc.user_message or 'please try again later'}"
+                ) from exc
             tenant.stripe_customer_id = customer.id
             self.db.add(tenant)
             await self.db.flush()
@@ -77,11 +83,23 @@ class BillingService:
                 items=[{"price": price_id}],
             )
         except stripe.error.InvalidRequestError as exc:
-            await logger.aerror("stripe_invalid_request", tenant_id=str(tenant_id), error=str(exc))
-            raise ValueError(f"Invalid subscription request: {exc.user_message or str(exc)}") from exc
+            await logger.aerror(
+                "stripe_invalid_request",
+                tenant_id=str(tenant_id), error=str(exc),
+            )
+            raise ValueError(
+                f"Invalid subscription request: "
+                f"{exc.user_message or str(exc)}"
+            ) from exc
         except stripe.error.StripeError as exc:
-            await logger.aerror("stripe_subscription_create_failed", tenant_id=str(tenant_id), error=str(exc))
-            raise ValueError(f"Payment provider error: {exc.user_message or 'please try again later'}") from exc
+            await logger.aerror(
+                "stripe_subscription_create_failed",
+                tenant_id=str(tenant_id), error=str(exc),
+            )
+            raise ValueError(
+                f"Payment provider error: "
+                f"{exc.user_message or 'please try again later'}"
+            ) from exc
 
         # Update tenant
         tenant.stripe_subscription_id = subscription.id

@@ -8,7 +8,8 @@ def _get_fernet() -> Fernet:
     if not settings.encryption_key:
         raise ValueError(
             "ENCRYPTION_KEY not set. Generate one with: "
-            "python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+            "python -c 'from cryptography.fernet import Fernet; "
+            "print(Fernet.generate_key().decode())'"
         )
     return Fernet(settings.encryption_key.encode())
 

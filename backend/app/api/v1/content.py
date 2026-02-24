@@ -26,7 +26,9 @@ from app.services.content_service import ContentService
 router = APIRouter()
 
 
-@router.post("/generate", response_model=ContentGenerateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/generate", response_model=ContentGenerateResponse, status_code=status.HTTP_201_CREATED
+)
 async def generate_content(
     request: ContentGenerateRequest,
     user: User = Depends(get_current_user),
@@ -103,7 +105,9 @@ async def generate_content(
         user_id=user.id,
         content_type=request.content_type,
         count=len(generated_items),
-        tokens=sum(c.prompt_tokens + c.completion_tokens for c in generated_items if c.prompt_tokens),
+        tokens=sum(
+            c.prompt_tokens + c.completion_tokens for c in generated_items if c.prompt_tokens
+        ),
     )
 
     return ContentGenerateResponse(
@@ -278,7 +282,7 @@ async def export_content(
     try:
         return await export_service.export(item, format)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/batch", response_model=BatchQueueResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -302,4 +306,6 @@ async def batch_generate(
         brand_profile_id=request.brand_profile_id,
         correlation_id=correlation_id,
     )
-    return BatchQueueResponse(message="Batch generation queued", listing_count=len(request.listing_ids))
+    return BatchQueueResponse(
+        message="Batch generation queued", listing_count=len(request.listing_ids)
+    )

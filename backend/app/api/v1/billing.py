@@ -1,5 +1,5 @@
-from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_tenant_db, require_role
@@ -47,4 +47,4 @@ async def create_subscription(
     try:
         return await billing.create_or_update_subscription(user.tenant_id, price_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

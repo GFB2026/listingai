@@ -1,9 +1,9 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
-from app.core.encryption import decrypt_value, encrypt_value
+from app.core.encryption import decrypt_value
 
 
 class RESOClient:
@@ -33,14 +33,14 @@ class RESOClient:
 
         self.access_token = data["access_token"]
         expires_in = data.get("expires_in", 3600)
-        self.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        self.token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
         return self.access_token
 
     async def _ensure_authenticated(self):
         if not self.access_token or (
             self.token_expires_at
-            and datetime.now(timezone.utc) >= self.token_expires_at
+            and datetime.now(UTC) >= self.token_expires_at
         ):
             await self.authenticate()
 

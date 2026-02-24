@@ -11,7 +11,10 @@ from app.core.redis import get_redis
 logger = structlog.get_logger()
 
 # Paths to skip rate limiting
-SKIP_PATHS = {"/health", "/health/live", "/health/ready", "/metrics", "/docs", "/redoc", "/openapi.json"}
+SKIP_PATHS = {
+    "/health", "/health/live", "/health/ready", "/metrics",
+    "/docs", "/redoc", "/openapi.json",
+}
 
 # Per-path overrides: (max_requests, window_seconds)
 PATH_LIMITS = {
@@ -77,11 +80,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if current_count > max_requests:
                 # Find oldest entry to calculate retry-after
                 oldest = await redis.zrange(key, 0, 0, withscores=True)
-                retry_after = int(window_seconds - (now - oldest[0][1])) if oldest else window_seconds
+                retry_after = (
+                    int(window_seconds - (now - oldest[0][1]))
+                    if oldest
+                    else window_seconds
+                )
 
                 response = JSONResponse(
                     status_code=429,
-                    content={"detail": f"Rate limit exceeded. Max {max_requests} requests per {window_seconds}s."},
+                    content={
+                        "detail": (
+                            f"Rate limit exceeded. Max {max_requests} "
+                            f"requests per {window_seconds}s."
+                        ),
+                    },
                 )
                 response.headers["X-RateLimit-Limit"] = str(max_requests)
                 response.headers["X-RateLimit-Remaining"] = "0"
@@ -95,7 +107,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         except (redis_exceptions.RedisError, ConnectionError, OSError):
             # Fail open — if Redis is unavailable, allow the request through
-            await logger.awarning("rate_limiter_redis_unavailable", path=path, client_ip=client_ip, exc_info=True)
+            await logger.awarning(
+                "rate_limiter_redis_unavailable",
+                path=path, client_ip=client_ip, exc_info=True,
+            )
             return await call_next(request)
         except RuntimeError as exc:
             # Redis pool not initialized (app startup race)

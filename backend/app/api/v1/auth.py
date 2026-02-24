@@ -1,6 +1,5 @@
 import re
 import time
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -125,7 +124,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def refresh(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    body: Optional[RefreshRequest] = None,
+    body: RefreshRequest | None = None,
 ):
     # Accept refresh token from cookie OR request body
     token = request.cookies.get("refresh_token")
