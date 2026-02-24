@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate marketing content (descriptions, social posts, emails, flyers, video scripts) from MLS listing data. It uses Claude for content generation, with a three-layer prompt system (system prompt + brand voice + listing data).
 
-**Version:** 1.3.0
+**Version:** 1.4.0
 
 ## Tech Stack
 
