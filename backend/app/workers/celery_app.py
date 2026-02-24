@@ -14,6 +14,7 @@ celery_app = Celery(
     include=[
         "app.workers.tasks.mls_sync",
         "app.workers.tasks.content_batch",
+        "app.workers.tasks.content_auto_gen",
         "app.workers.tasks.media_process",
     ],
 )

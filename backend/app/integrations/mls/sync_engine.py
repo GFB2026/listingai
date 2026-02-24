@@ -23,6 +23,7 @@ class SyncEngine:
         """Run incremental sync for a single MLS connection."""
         client = RESOClient.from_connection(connection)
         stats = {"created": 0, "updated": 0, "errors": 0, "total": 0}
+        new_listing_ids: list[str] = []
 
         try:
             # Build filter using watermark for incremental sync
@@ -62,11 +63,17 @@ class SyncEngine:
                             ]
                             normalized["photos"] = photos
 
-                        await self.listing_service.upsert_from_mls(
+                        listing, is_new = await self.listing_service.upsert_from_mls(
                             tenant_id=connection.tenant_id,
                             mls_connection_id=connection.id,
                             mls_data=normalized,
                         )
+
+                        if is_new:
+                            stats["created"] += 1
+                            new_listing_ids.append(str(listing.id))
+                        else:
+                            stats["updated"] += 1
 
                         # Track latest timestamp (parse to datetime for safe comparison)
                         mod_ts = record.get("ModificationTimestamp")
@@ -80,8 +87,6 @@ class SyncEngine:
                                     latest_timestamp = mod_ts
                             else:
                                 latest_timestamp = mod_ts
-
-                        stats["created" if not normalized.get("id") else "updated"] += 1
 
                     except Exception as e:
                         stats["errors"] += 1
@@ -105,6 +110,27 @@ class SyncEngine:
 
         finally:
             await client.close()
+
+        # Dispatch auto-generation for new listings
+        if new_listing_ids:
+            try:
+                from app.workers.tasks.content_auto_gen import auto_generate_for_new_listings
+
+                auto_generate_for_new_listings.delay(
+                    tenant_id=str(connection.tenant_id),
+                    listing_ids=new_listing_ids,
+                )
+                await logger.ainfo(
+                    "auto_gen_dispatched",
+                    connection_id=str(connection.id),
+                    new_listing_count=len(new_listing_ids),
+                )
+            except Exception as e:
+                await logger.aerror(
+                    "auto_gen_dispatch_error",
+                    connection_id=str(connection.id),
+                    error=str(e),
+                )
 
         await logger.ainfo("sync_complete", connection_id=str(connection.id), stats=stats)
         return stats

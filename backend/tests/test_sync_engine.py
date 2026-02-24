@@ -1,5 +1,6 @@
 """Tests for MLS sync engine."""
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,15 +77,17 @@ class TestSyncConnection:
         mock_client.get_media = AsyncMock(return_value={"value": []})
         mock_client.close = AsyncMock()
 
-        mock_upsert = AsyncMock(return_value=MagicMock())
+        mock_listing = MagicMock()
+        mock_listing.id = uuid4()
+        mock_upsert = AsyncMock(return_value=(mock_listing, True))
 
         with (
             patch(
                 "app.integrations.mls.sync_engine.RESOClient.from_connection",
                 return_value=mock_client,
             ),
-            patch.object(
-                SyncEngine, "__init__", lambda self, db: setattr(self, "db", db) or setattr(self, "listing_service", MagicMock(upsert_from_mls=mock_upsert)),
+            patch(
+                "app.workers.tasks.content_auto_gen.auto_generate_for_new_listings",
             ),
         ):
             engine = SyncEngine.__new__(SyncEngine)
@@ -113,11 +116,21 @@ class TestSyncConnection:
         mock_client.get_media = AsyncMock(return_value={"value": []})
         mock_client.close = AsyncMock()
 
-        mock_upsert = AsyncMock(return_value=MagicMock())
+        def _make_upsert_result(*args, **kwargs):
+            mock_listing = MagicMock()
+            mock_listing.id = uuid4()
+            return (mock_listing, True)
 
-        with patch(
-            "app.integrations.mls.sync_engine.RESOClient.from_connection",
-            return_value=mock_client,
+        mock_upsert = AsyncMock(side_effect=_make_upsert_result)
+
+        with (
+            patch(
+                "app.integrations.mls.sync_engine.RESOClient.from_connection",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.workers.tasks.content_auto_gen.auto_generate_for_new_listings",
+            ),
         ):
             engine = SyncEngine.__new__(SyncEngine)
             engine.db = db_session
@@ -163,9 +176,14 @@ class TestSyncConnection:
 
         mock_upsert = AsyncMock(side_effect=Exception("DB error"))
 
-        with patch(
-            "app.integrations.mls.sync_engine.RESOClient.from_connection",
-            return_value=mock_client,
+        with (
+            patch(
+                "app.integrations.mls.sync_engine.RESOClient.from_connection",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.workers.tasks.content_auto_gen.auto_generate_for_new_listings",
+            ),
         ):
             engine = SyncEngine.__new__(SyncEngine)
             engine.db = db_session
@@ -174,6 +192,79 @@ class TestSyncConnection:
 
         assert stats["errors"] == 1
         assert stats["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_auto_gen_dispatched_for_new_listings(
+        self, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        conn = _make_connection(test_tenant.id)
+        db_session.add(conn)
+        await db_session.flush()
+
+        mock_client = AsyncMock()
+        mock_client.get_properties = AsyncMock(
+            return_value={"value": [_reso_property()]}
+        )
+        mock_client.get_media = AsyncMock(return_value={"value": []})
+        mock_client.close = AsyncMock()
+
+        mock_listing = MagicMock()
+        mock_listing.id = uuid4()
+        mock_upsert = AsyncMock(return_value=(mock_listing, True))
+
+        with (
+            patch(
+                "app.integrations.mls.sync_engine.RESOClient.from_connection",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.workers.tasks.content_auto_gen.auto_generate_for_new_listings",
+            ) as mock_auto_gen,
+        ):
+            engine = SyncEngine.__new__(SyncEngine)
+            engine.db = db_session
+            engine.listing_service = MagicMock(upsert_from_mls=mock_upsert)
+            await engine.sync_connection(conn)
+
+        mock_auto_gen.delay.assert_called_once_with(
+            tenant_id=str(conn.tenant_id),
+            listing_ids=[str(mock_listing.id)],
+        )
+
+    @pytest.mark.asyncio
+    async def test_auto_gen_not_dispatched_for_updates(
+        self, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        conn = _make_connection(test_tenant.id)
+        db_session.add(conn)
+        await db_session.flush()
+
+        mock_client = AsyncMock()
+        mock_client.get_properties = AsyncMock(
+            return_value={"value": [_reso_property()]}
+        )
+        mock_client.get_media = AsyncMock(return_value={"value": []})
+        mock_client.close = AsyncMock()
+
+        mock_listing = MagicMock()
+        mock_listing.id = uuid4()
+        mock_upsert = AsyncMock(return_value=(mock_listing, False))
+
+        with (
+            patch(
+                "app.integrations.mls.sync_engine.RESOClient.from_connection",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.workers.tasks.content_auto_gen.auto_generate_for_new_listings",
+            ) as mock_auto_gen,
+        ):
+            engine = SyncEngine.__new__(SyncEngine)
+            engine.db = db_session
+            engine.listing_service = MagicMock(upsert_from_mls=mock_upsert)
+            await engine.sync_connection(conn)
+
+        mock_auto_gen.delay.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_sync_tenant(self, db_session: AsyncSession, test_tenant: Tenant):

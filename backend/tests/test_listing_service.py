@@ -45,12 +45,13 @@ class TestUpsertFromMls:
             "sqft": 1500,
         }
 
-        listing = await service.upsert_from_mls(
+        listing, is_new = await service.upsert_from_mls(
             tenant_id=test_tenant.id,
             mls_connection_id=conn.id,
             mls_data=mls_data,
         )
 
+        assert is_new is True
         assert listing.mls_listing_id == "MLS-001"
         assert listing.price == 750000
         assert listing.tenant_id == test_tenant.id
@@ -89,12 +90,13 @@ class TestUpsertFromMls:
             "status": "pending",
         }
 
-        updated = await service.upsert_from_mls(
+        updated, is_new = await service.upsert_from_mls(
             tenant_id=test_tenant.id,
             mls_connection_id=conn.id,
             mls_data=mls_data,
         )
 
+        assert is_new is False
         assert updated.id == listing.id  # Same record
         assert updated.price == 525000
         assert updated.status == "pending"
@@ -134,11 +136,12 @@ class TestUpsertFromMls:
             "status": "sold",
         }
 
-        updated = await service.upsert_from_mls(
+        updated, is_new = await service.upsert_from_mls(
             tenant_id=test_tenant.id,
             mls_connection_id=conn.id,
             mls_data=mls_data,
         )
 
+        assert is_new is False
         assert updated.price == 400000  # Not overwritten by None
         assert updated.status == "sold"

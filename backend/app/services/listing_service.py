@@ -15,8 +15,13 @@ class ListingService:
         tenant_id: UUID,
         mls_connection_id: UUID,
         mls_data: dict,
-    ) -> Listing:
-        """Insert or update a listing from normalized MLS data."""
+    ) -> tuple[Listing, bool]:
+        """Insert or update a listing from normalized MLS data.
+
+        Returns:
+            Tuple of (listing, is_new) where is_new is True if the listing
+            was created (not just updated).
+        """
         mls_listing_id = mls_data.get("mls_listing_id")
 
         # Check for existing listing
@@ -33,6 +38,7 @@ class ListingService:
             for key, value in mls_data.items():
                 if hasattr(listing, key) and value is not None:
                     setattr(listing, key, value)
+            is_new = False
         else:
             # Create new
             listing = Listing(
@@ -41,6 +47,7 @@ class ListingService:
                 **mls_data,
             )
             self.db.add(listing)
+            is_new = True
 
         await self.db.flush()
-        return listing
+        return listing, is_new
