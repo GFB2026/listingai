@@ -19,7 +19,7 @@ Lead tracking and agent landing pages release.
 - **Analytics Charts** — source breakdown, funnel visualization, agent leaderboard
 - **Agent Hero & Property Hero** — public-facing agent profile and listing detail components
 - **Lead Capture Form** — public form with validation, UTM/session capture, and success state
-- 61 new backend tests across 3 new test files (test_agent_pages_api, test_leads_api, test_public_api)
+- 81 new backend tests across 5 new test files (test_agent_pages_api, test_leads_api, test_public_api, test_content_auto_gen, test_admin_api)
 - 24 new frontend tests across 3 new test files (useLeads, useAgentPages, useLeadAnalytics)
 - New hooks: `useLeads`, `useAgentPages`, `useLeadAnalytics` with full mutation support and toast notifications
 - Public Axios instance (`public-api.ts`) for unauthenticated API calls
@@ -30,13 +30,14 @@ Lead tracking and agent landing pages release.
 - Production Docker health checks: `localhost` → `127.0.0.1` for frontend wget, `/health/ready` → `/health/live` for backend liveness
 
 ### Changed
-- Backend test count: 312 → 373 (35 test files)
+- Backend test count: 312 → 393 (37 test files)
 - Frontend test count: 119 → 143 (22 test files)
 - CSRF middleware exempts `/api/v1/public/` prefix
 - Rate limiter adds public endpoint limits (leads: 10/min, visits: 30/min, general public: 60/min)
 - Sidebar updated with Leads, Lead Analytics, and Agent Pages navigation
 - Dashboard page includes lead stats and quick actions
 - Migration chain extended: `d4e5f6a7b8c9` → `e5f6a7b8c9d0` (lead tracking tables with RLS)
+- `content_auto_gen.py`, `admin.py`, `agent_pages.py` now at 100% coverage
 - Version bumped to 1.4.0
 
 ### Database
