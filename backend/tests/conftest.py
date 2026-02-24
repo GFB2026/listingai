@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
@@ -11,11 +12,15 @@ from app.core.security import hash_password
 from app.main import create_app
 
 # Import ALL models so Base.metadata knows about them for create_all/drop_all
+from app.models.agent_page import AgentPage  # noqa: F401
 from app.models.brand_profile import BrandProfile
 from app.models.content import Content
 from app.models.content_version import ContentVersion  # noqa: F401
+from app.models.lead import Lead  # noqa: F401
+from app.models.lead_activity import LeadActivity  # noqa: F401
 from app.models.listing import Listing
 from app.models.mls_connection import MLSConnection  # noqa: F401
+from app.models.page_visit import PageVisit  # noqa: F401
 from app.models.tenant import Tenant
 from app.models.usage_event import UsageEvent  # noqa: F401
 from app.models.user import User
@@ -26,20 +31,34 @@ settings = get_settings()
 _base_url = settings.database_url
 TEST_DATABASE_URL = _base_url.rsplit("/", 1)[0] + "/listingai_test"
 
+_tables_created = False
+
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    global _tables_created
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if not _tables_created:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        _tables_created = True
+
+    session_factory = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False,
+    )
 
     async with session_factory() as session:
         yield session
 
+    # Truncate all data between tests (fast, no DDL locks)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        table_names = ", ".join(
+            f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables)
+        )
+        if table_names:
+            await conn.execute(text(f"TRUNCATE {table_names} CASCADE"))
 
     await engine.dispose()
 
