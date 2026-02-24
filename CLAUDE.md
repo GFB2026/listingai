@@ -18,7 +18,7 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 ## Testing
 
 ### Backend
-- **306 tests** across 31 test files, all passing
+- **312 tests** across 32 test files, all passing
 - **97% code coverage** (2302/2367 statements) — CI gate is 60%
 - Tests use mocked external services (no real API keys, Stripe, S3, or MLS calls)
 - `asyncio_mode = "auto"` with `asyncio_default_fixture_loop_scope = "function"` — async tests auto-detected
@@ -107,7 +107,7 @@ cd backend && alembic upgrade head
 cd backend && alembic revision --autogenerate -m "description"
 ```
 
-Migration chain: `cbe7f3435501` (initial schema) → `a1b2c3d4e5f6` (constraints + RLS) → `b2c3d4e5f6a7` (performance indexes) → `c3d4e5f6a7b8` (updated_at columns)
+Migration chain: `cbe7f3435501` (initial schema) → `a1b2c3d4e5f6` (constraints + RLS) → `b2c3d4e5f6a7` (performance indexes) → `c3d4e5f6a7b8` (updated_at columns) → `d4e5f6a7b8c9` (brand profile unique default)
 
 ## Architecture
 
