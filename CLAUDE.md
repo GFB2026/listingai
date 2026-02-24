@@ -18,7 +18,7 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 ## Testing
 
 ### Backend
-- **312 tests** across 32 test files, all passing
+- **373 tests** across 35 test files, all passing
 - **87% code coverage** (2676/3081 statements) — CI gate is 60%
 - Tests use mocked external services (no real API keys, Stripe, S3, or MLS calls)
 - `asyncio_mode = "auto"` with `asyncio_default_fixture_loop_scope = "function"` — async tests auto-detected
@@ -26,7 +26,7 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 - **Test fixture pattern** (`conftest.py`): `db_session` is function-scoped, creates its own engine per test. A module-level `_tables_created` flag ensures DDL (`drop_all`/`create_all`) runs only once; subsequent tests use `TRUNCATE CASCADE` for fast cleanup. Engine is disposed after each test. This avoids cross-event-loop asyncpg deadlocks that occur when a session-scoped engine shares connections across function-scoped event loops (especially under coverage with greenlet+thread concurrency)
 
 ### Frontend
-- **119 tests** across 19 test files (Vitest + React Testing Library + MSW)
+- **143 tests** across 22 test files (Vitest + React Testing Library + MSW)
 - Tests cover hooks, components, API client, auth context, and utilities
 
 ### Docker Tests
@@ -108,7 +108,7 @@ cd backend && alembic upgrade head
 cd backend && alembic revision --autogenerate -m "description"
 ```
 
-Migration chain: `cbe7f3435501` (initial schema) → `a1b2c3d4e5f6` (constraints + RLS) → `b2c3d4e5f6a7` (performance indexes) → `c3d4e5f6a7b8` (updated_at columns) → `d4e5f6a7b8c9` (brand profile unique default)
+Migration chain: `cbe7f3435501` (initial schema) → `a1b2c3d4e5f6` (constraints + RLS) → `b2c3d4e5f6a7` (performance indexes) → `c3d4e5f6a7b8` (updated_at columns) → `d4e5f6a7b8c9` (brand profile unique default) → `e5f6a7b8c9d0` (lead tracking tables)
 
 ## Architecture
 
