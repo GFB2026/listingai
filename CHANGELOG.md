@@ -20,7 +20,7 @@ Lead tracking and agent landing pages release.
 - **Agent Hero & Property Hero** — public-facing agent profile and listing detail components
 - **Lead Capture Form** — public form with validation, UTM/session capture, and success state
 - 81 new backend tests across 5 new test files (test_agent_pages_api, test_leads_api, test_public_api, test_content_auto_gen, test_admin_api)
-- 24 new frontend tests across 3 new test files (useLeads, useAgentPages, useLeadAnalytics)
+- 99 new frontend tests across 13 new test files (useLeads, useAgentPages, useLeadAnalytics, utm, sentry, LeadCard, AgentHero, PropertyHero, LeadPipelineBoard, LeadAnalyticsCharts, LeadCaptureForm, BrandVoiceSelector, skeleton)
 - New hooks: `useLeads`, `useAgentPages`, `useLeadAnalytics` with full mutation support and toast notifications
 - Public Axios instance (`public-api.ts`) for unauthenticated API calls
 - UTM parameter capture utility (`utm.ts`) with session storage
@@ -31,7 +31,7 @@ Lead tracking and agent landing pages release.
 
 ### Changed
 - Backend test count: 312 → 393 (37 test files)
-- Frontend test count: 119 → 143 (22 test files)
+- Frontend test count: 119 → 218 (32 test files), coverage 53% → 76%
 - CSRF middleware exempts `/api/v1/public/` prefix
 - Rate limiter adds public endpoint limits (leads: 10/min, visits: 30/min, general public: 60/min)
 - Sidebar updated with Leads, Lead Analytics, and Agent Pages navigation
