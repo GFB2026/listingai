@@ -1,11 +1,4 @@
-# Starlette DoS via Range header merging - pinned by FastAPI 0.115 (starlette 0.41.3)
-# Cannot upgrade without breaking FastAPI compatibility
-CVE-2025-62727
-
-# Starlette path traversal in StaticFiles - pinned by FastAPI 0.115
-CVE-2025-54121
-
-# glob command injection - transitive dep of @sentry/bundler-plugin-core
+# glob command injection - transitive dep of @sentry/bundler-plugin-core (CLI-only, not exploitable)
 CVE-2025-64756
 
 # minimatch DoS - transitive dep of @typescript-eslint, eslint

@@ -53,7 +53,7 @@ jobs:
           key: pip-test-${{ hashFiles('backend/requirements-dev.txt') }}
           restore-keys: pip-test-
       - run: pip install -r backend/requirements-dev.txt
-      - run: cd backend && pytest --cov=app --cov-fail-under=60 -v
+      - run: cd backend && pytest --cov=app --cov-fail-under=60 --cov-report=xml:coverage.xml -v
         env:
           DATABASE_URL: postgresql+asyncpg://listingai:listingai_dev@localhost:5432/listingai_test
           DATABASE_URL_SYNC: postgresql://listingai:listingai_dev@localhost:5432/listingai_test
@@ -63,7 +63,7 @@ jobs:
         if: always()
         with:
           name: coverage-report
-          path: backend/.coverage
+          path: backend/coverage.xml
 
   backend-security:
     runs-on: ubuntu-latest
@@ -80,8 +80,6 @@ jobs:
       - name: Audit Python dependencies
         run: >-
           pip-audit -r backend/requirements.txt
-          --ignore-vuln CVE-2025-54121
-          --ignore-vuln CVE-2025-62727
           --ignore-vuln CVE-2024-23342
       - name: Run SAST (bandit)
         run: bandit -r backend/app/ -ll -q
