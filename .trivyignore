@@ -4,3 +4,15 @@ CVE-2025-62727
 
 # Starlette path traversal in StaticFiles - pinned by FastAPI 0.115
 CVE-2025-54121
+
+# glob command injection - transitive dep of @sentry/bundler-plugin-core
+CVE-2025-64756
+
+# minimatch DoS - transitive dep of @typescript-eslint, eslint
+CVE-2026-26996
+
+# node-tar vulnerabilities - bundled with npm in node:22-alpine base image
+CVE-2026-23745
+CVE-2026-23950
+CVE-2026-24842
+CVE-2026-26960
