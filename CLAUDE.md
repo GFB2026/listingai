@@ -10,18 +10,28 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 
 ## Tech Stack
 
-- **Backend:** Python 3.12, FastAPI 0.115, SQLAlchemy 2 (async), Celery 5, Redis 7, PostgreSQL 16
+- **Backend:** Python 3.12, FastAPI 0.133, SQLAlchemy 2 (async), Celery 5, Redis 7, PostgreSQL 16
 - **Frontend:** Next.js 15 (App Router), React 19, TypeScript 5.7, TailwindCSS 4, React Query 5, Zustand
 - **Infrastructure:** Docker Compose, MinIO (S3-compatible), Alembic migrations
 - **AI:** Anthropic SDK (Sonnet 4.5 for most content, Haiku 4.5 for short-form like tweets)
 
 ## Testing
 
+### Backend
 - **304 tests** across 31 test files, all passing
 - **97% code coverage** (2302/2367 statements) — CI gate is 60%
 - Tests use mocked external services (no real API keys, Stripe, S3, or MLS calls)
-- `asyncio_mode = "auto"` — async tests auto-detected
+- `asyncio_mode = "auto"` with `asyncio_default_fixture_loop_scope = "function"` — async tests auto-detected
 - Coverage report: `cd backend && pytest --cov=app --cov-report=term-missing`
+
+### Frontend
+- **119 tests** across 19 test files (Vitest + React Testing Library + MSW)
+- Tests cover hooks, components, API client, auth context, and utilities
+
+### Docker Tests
+- `make docker-test` runs the full backend suite inside Docker (postgres + redis)
+- Uses `docker/docker-compose.test.yml` overlay with Docker service hostnames
+- Test database auto-created via `docker/scripts/init-test-db.sql`
 
 ## Common Commands
 
@@ -57,8 +67,9 @@ make load-test PROFILE=stress # 100 VUs ramp over 12 min
 make backend      # Start FastAPI dev server (uvicorn --reload on :8000)
 make worker       # Start Celery worker
 make beat         # Start Celery Beat scheduler
-make test         # Run pytest
-make test-cov     # Run pytest with coverage
+make test         # Run all tests (backend + frontend)
+make test-cov     # Run backend tests with coverage
+make docker-test  # Run backend tests inside Docker (postgres + redis)
 make lint         # ruff check + npm lint
 make fmt          # ruff format + npm format
 ```
@@ -78,6 +89,8 @@ Async tests auto-detected — `asyncio_mode = "auto"` in `pyproject.toml`.
 ```bash
 make frontend          # Start Next.js dev server on :3000
 make frontend-install  # npm install
+make frontend-test     # Run frontend tests (vitest)
+make frontend-test-cov # Run frontend tests with coverage
 ```
 
 ### Database
@@ -147,7 +160,7 @@ Tenant → Users, Listings, BrandProfiles, MLSConnections, Content → ContentVe
 
 ### Production Infrastructure (`docker/`)
 
-**Compose overlays:** Base `docker-compose.yml` + `docker-compose.prod.yml` (production) or `docker-compose.staging.yml` (staging).
+**Compose overlays:** Base `docker-compose.yml` + `docker-compose.prod.yml` (production), `docker-compose.staging.yml` (staging), or `docker-compose.test.yml` (testing).
 
 Production stack adds:
 - **Nginx** — Reverse proxy with TLS 1.2/1.3, rate limiting (auth:5r/s, api:30r/s, general:60r/s), upstream health checks
@@ -161,11 +174,11 @@ Deployment runbook: `docs/deployment-runbook.md`
 ### CI/CD (`.github/workflows/ci.yml`)
 
 5 jobs run on push to main/master and PRs to main:
-- **backend-lint** — Ruff linting with pip cache
-- **backend-test** — pytest with PostgreSQL + Redis services, 60% coverage gate, coverage artifact upload
-- **backend-security** — pip-audit (dependency vulnerabilities) + bandit (SAST)
-- **frontend-build** — ESLint + TypeScript strict check + npm audit + Next.js build, npm cache
-- **docker-security** — Trivy container image scanning for CRITICAL/HIGH vulnerabilities (runs after backend-test + frontend-build)
+- **backend-lint** — Ruff linting (pinned to ruff==0.8.4) with pip cache
+- **backend-test** — pytest with PostgreSQL + Redis services, 60% coverage gate, coverage XML artifact upload
+- **backend-security** — pip-audit (dependency vulnerabilities, with `--ignore-vuln` for unfixable transitive CVEs) + bandit (SAST)
+- **frontend-build** — ESLint + Vitest + TypeScript strict check + npm audit + Next.js build, npm cache
+- **docker-security** — Trivy container image scanning for CRITICAL/HIGH vulnerabilities with `.trivyignore` (runs after backend-test + frontend-build)
 
 Dependabot configured for pip (weekly), npm (weekly), and GitHub Actions (monthly).
 
