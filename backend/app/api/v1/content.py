@@ -69,17 +69,33 @@ async def generate_content(
     ai_service = AIService()
 
     generated_items = []
-    for _ in range(request.variants):
+    for _i in range(request.variants):
+        # Re-check credits before each variant to prevent over-consumption
+        remaining = await content_service.get_remaining_credits(user.tenant_id)
+        if remaining < 1:
+            if not generated_items:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Insufficient credits. 0 remaining.",
+                )
+            break
+
         start = time.time()
-        result = await ai_service.generate(
-            listing=listing,
-            content_type=request.content_type,
-            tone=request.tone,
-            brand_profile_id=request.brand_profile_id,
-            instructions=request.instructions,
-            tenant_id=str(user.tenant_id),
-            db=db,
-        )
+        try:
+            result = await ai_service.generate(
+                listing=listing,
+                content_type=request.content_type,
+                tone=request.tone,
+                brand_profile_id=request.brand_profile_id,
+                instructions=request.instructions,
+                tenant_id=str(user.tenant_id),
+                db=db,
+            )
+        except Exception:
+            if not generated_items:
+                raise
+            break
+
         generation_time_ms = int((time.time() - start) * 1000)
 
         content_item = await content_service.create(
@@ -96,19 +112,16 @@ async def generate_content(
             completion_tokens=result.get("completion_tokens", 0),
             generation_time_ms=generation_time_ms,
         )
-        generated_items.append(content_item)
 
-    # Track usage — same session/transaction as content creation above,
-    # so both commit or both roll back together.
-    await content_service.track_usage(
-        tenant_id=user.tenant_id,
-        user_id=user.id,
-        content_type=request.content_type,
-        count=len(generated_items),
-        tokens=sum(
-            c.prompt_tokens + c.completion_tokens for c in generated_items if c.prompt_tokens
-        ),
-    )
+        # Track usage immediately per-variant so credits are consumed atomically
+        await content_service.track_usage(
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            content_type=request.content_type,
+            count=1,
+            tokens=(result.get("prompt_tokens", 0) + result.get("completion_tokens", 0)),
+        )
+        generated_items.append(content_item)
 
     return ContentGenerateResponse(
         content=[ContentResponse.model_validate(c) for c in generated_items],

@@ -1,4 +1,5 @@
 """Tests for MLS sync engine."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -71,9 +72,7 @@ class TestSyncConnection:
         await db_session.flush()
 
         mock_client = AsyncMock()
-        mock_client.get_properties = AsyncMock(
-            return_value={"value": [_reso_property()]}
-        )
+        mock_client.get_properties = AsyncMock(return_value={"value": [_reso_property()]})
         mock_client.get_media = AsyncMock(return_value={"value": []})
         mock_client.close = AsyncMock()
 
@@ -98,6 +97,8 @@ class TestSyncConnection:
         assert stats["total"] == 1
         assert stats["created"] == 1
         mock_upsert.assert_called_once()
+        # Watermark should advance on successful sync (zero errors)
+        assert conn.sync_watermark == "2025-01-15T10:00:00Z"
 
     @pytest.mark.asyncio
     async def test_pagination(self, db_session: AsyncSession, test_tenant: Tenant):
@@ -110,9 +111,7 @@ class TestSyncConnection:
         page2 = []
 
         mock_client = AsyncMock()
-        mock_client.get_properties = AsyncMock(
-            side_effect=[{"value": page1}, {"value": page2}]
-        )
+        mock_client.get_properties = AsyncMock(side_effect=[{"value": page1}, {"value": page2}])
         mock_client.get_media = AsyncMock(return_value={"value": []})
         mock_client.close = AsyncMock()
 
@@ -168,9 +167,7 @@ class TestSyncConnection:
         await db_session.flush()
 
         mock_client = AsyncMock()
-        mock_client.get_properties = AsyncMock(
-            return_value={"value": [_reso_property()]}
-        )
+        mock_client.get_properties = AsyncMock(return_value={"value": [_reso_property()]})
         mock_client.get_media = AsyncMock(return_value={"value": []})
         mock_client.close = AsyncMock()
 
@@ -194,6 +191,41 @@ class TestSyncConnection:
         assert stats["total"] == 1
 
     @pytest.mark.asyncio
+    async def test_watermark_not_advanced_on_errors(
+        self, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """When a record fails processing, watermark should stay at original value."""
+        original_watermark = "2025-01-10T00:00:00Z"
+        conn = _make_connection(test_tenant.id, watermark=original_watermark)
+        db_session.add(conn)
+        await db_session.flush()
+
+        mock_client = AsyncMock()
+        mock_client.get_properties = AsyncMock(return_value={"value": [_reso_property()]})
+        mock_client.get_media = AsyncMock(return_value={"value": []})
+        mock_client.close = AsyncMock()
+
+        mock_upsert = AsyncMock(side_effect=Exception("DB error"))
+
+        with (
+            patch(
+                "app.integrations.mls.sync_engine.RESOClient.from_connection",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.workers.tasks.content_auto_gen.auto_generate_for_new_listings",
+            ),
+        ):
+            engine = SyncEngine.__new__(SyncEngine)
+            engine.db = db_session
+            engine.listing_service = MagicMock(upsert_from_mls=mock_upsert)
+            stats = await engine.sync_connection(conn)
+
+        assert stats["errors"] == 1
+        # Watermark must NOT advance when there are errors
+        assert conn.sync_watermark == original_watermark
+
+    @pytest.mark.asyncio
     async def test_auto_gen_dispatched_for_new_listings(
         self, db_session: AsyncSession, test_tenant: Tenant
     ):
@@ -202,9 +234,7 @@ class TestSyncConnection:
         await db_session.flush()
 
         mock_client = AsyncMock()
-        mock_client.get_properties = AsyncMock(
-            return_value={"value": [_reso_property()]}
-        )
+        mock_client.get_properties = AsyncMock(return_value={"value": [_reso_property()]})
         mock_client.get_media = AsyncMock(return_value={"value": []})
         mock_client.close = AsyncMock()
 
@@ -240,9 +270,7 @@ class TestSyncConnection:
         await db_session.flush()
 
         mock_client = AsyncMock()
-        mock_client.get_properties = AsyncMock(
-            return_value={"value": [_reso_property()]}
-        )
+        mock_client.get_properties = AsyncMock(return_value={"value": [_reso_property()]})
         mock_client.get_media = AsyncMock(return_value={"value": []})
         mock_client.close = AsyncMock()
 

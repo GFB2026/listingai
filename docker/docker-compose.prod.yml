@@ -156,12 +156,17 @@ services:
     environment:
       PGHOST: postgres
       PGUSER: listingai
-      PGPASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: listingai
     volumes:
       - backups:/backups
       - ./scripts/backup.sh:/backup.sh:ro
-    entrypoint: "/bin/sh -c 'chmod +x /backup.sh && while true; do /backup.sh; sleep 86400; done'"
+    entrypoint: >
+      /bin/sh -c '
+      echo "postgres:5432:listingai:listingai:${POSTGRES_PASSWORD}" > ~/.pgpass &&
+      chmod 600 ~/.pgpass &&
+      chmod +x /backup.sh &&
+      while true; do /backup.sh; sleep 86400; done
+      '
     deploy:
       resources:
         limits:

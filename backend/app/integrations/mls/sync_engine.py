@@ -29,9 +29,7 @@ class SyncEngine:
             # Build filter using watermark for incremental sync
             filter_query = None
             if connection.sync_watermark:
-                filter_query = (
-                    f"ModificationTimestamp gt {connection.sync_watermark}"
-                )
+                filter_query = f"ModificationTimestamp gt {connection.sync_watermark}"
 
             latest_timestamp = connection.sync_watermark
             skip = 0
@@ -58,8 +56,7 @@ class SyncEngine:
                         if listing_key:
                             media_data = await client.get_media(listing_key)
                             photos = [
-                                MediaAdapter.normalize(m)
-                                for m in media_data.get("value", [])
+                                MediaAdapter.normalize(m) for m in media_data.get("value", [])
                             ]
                             normalized["photos"] = photos
 
@@ -102,11 +99,13 @@ class SyncEngine:
                 if len(records) < page_size:
                     break
 
-            # Update watermark
-            if latest_timestamp:
+            # Only advance watermark if all records processed without errors.
+            # On partial failure, keep old watermark so failed records are re-fetched.
+            if latest_timestamp and stats["errors"] == 0:
                 connection.sync_watermark = latest_timestamp
             connection.last_sync_at = datetime.now(UTC)
             self.db.add(connection)
+            await self.db.flush()
 
         finally:
             await client.close()

@@ -7,11 +7,12 @@ services:
     build:
       context: ..
       dockerfile: docker/backend.Dockerfile
-    user: root
+      target: test
     volumes:
       - ../backend:/app
     environment:
       APP_ENV: testing
+      PYTHONDONTWRITEBYTECODE: "1"
       DATABASE_URL: postgresql+asyncpg://listingai:listingai_dev@postgres:5432/listingai
       DATABASE_URL_SYNC: postgresql://listingai:listingai_dev@postgres:5432/listingai
       REDIS_URL: redis://redis:6379/0
@@ -22,6 +23,4 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: >
-      sh -c "pip install --no-cache-dir -r requirements-dev.txt &&
-             pytest -v --tb=short"
+    command: pytest -v --tb=short

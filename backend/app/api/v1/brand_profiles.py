@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_tenant_db
@@ -35,17 +36,16 @@ async def create_brand_profile(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
-    # If this is set as default, unset other defaults
+    # If this is set as default, atomically unset other defaults
     if request.is_default:
-        existing = await db.execute(
-            select(BrandProfile).where(
+        await db.execute(
+            sa_update(BrandProfile)
+            .where(
                 BrandProfile.tenant_id == user.tenant_id,
                 BrandProfile.is_default.is_(True),
             )
+            .values(is_default=False)
         )
-        for bp in existing.scalars().all():
-            bp.is_default = False
-            db.add(bp)
 
     profile = BrandProfile(
         tenant_id=user.tenant_id,
@@ -79,7 +79,21 @@ async def update_brand_profile(
     if not profile:
         raise HTTPException(status_code=404, detail="Brand profile not found")
 
-    for field, value in update.model_dump(exclude_unset=True).items():
+    update_data = update.model_dump(exclude_unset=True)
+
+    # If setting this profile as default, atomically unset other defaults first
+    if update_data.get("is_default") is True:
+        await db.execute(
+            sa_update(BrandProfile)
+            .where(
+                BrandProfile.tenant_id == user.tenant_id,
+                BrandProfile.is_default.is_(True),
+                BrandProfile.id != profile.id,
+            )
+            .values(is_default=False)
+        )
+
+    for field, value in update_data.items():
         setattr(profile, field, value)
 
     db.add(profile)

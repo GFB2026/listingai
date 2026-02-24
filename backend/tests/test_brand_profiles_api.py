@@ -1,4 +1,5 @@
 """Tests for brand profile API endpoints: list, create, update, delete."""
+
 import uuid
 
 from httpx import AsyncClient
@@ -31,9 +32,7 @@ class TestListBrandProfiles:
 
 
 class TestCreateBrandProfile:
-    async def test_create_profile(
-        self, client: AsyncClient, test_user: User, test_tenant: Tenant
-    ):
+    async def test_create_profile(self, client: AsyncClient, test_user: User, test_tenant: Tenant):
         headers = await auth_headers(client, "test@example.com", "testpassword123")
         resp = await client.post(
             "/api/v1/brand-profiles",
@@ -74,14 +73,10 @@ class TestCreateBrandProfile:
         assert len(defaults) == 1
         assert defaults[0]["name"] == "New Default"
 
-    async def test_create_profile_validation(
-        self, client: AsyncClient, test_user: User
-    ):
+    async def test_create_profile_validation(self, client: AsyncClient, test_user: User):
         headers = await auth_headers(client, "test@example.com", "testpassword123")
         # Missing required name
-        resp = await client.post(
-            "/api/v1/brand-profiles", headers=headers, json={}
-        )
+        resp = await client.post("/api/v1/brand-profiles", headers=headers, json={})
         assert resp.status_code == 422
 
 
@@ -100,9 +95,37 @@ class TestUpdateBrandProfile:
         assert data["name"] == "Updated Coastal"
         assert data["voice_description"] == "Updated description"
 
-    async def test_update_profile_not_found(
-        self, client: AsyncClient, test_user: User
+    async def test_update_profile_to_default_unsets_others(
+        self, client: AsyncClient, test_user: User, test_brand_profile: BrandProfile
     ):
+        """Updating a profile to is_default=True should unset others."""
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        # Create a second non-default profile
+        resp = await client.post(
+            "/api/v1/brand-profiles",
+            headers=headers,
+            json={"name": "Second Voice", "voice_description": "Second"},
+        )
+        assert resp.status_code == 201
+        second_id = resp.json()["id"]
+
+        # Update the second profile to be default
+        resp = await client.patch(
+            f"/api/v1/brand-profiles/{second_id}",
+            headers=headers,
+            json={"is_default": True},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_default"] is True
+
+        # Verify only one default exists
+        list_resp = await client.get("/api/v1/brand-profiles", headers=headers)
+        profiles = list_resp.json()
+        defaults = [p for p in profiles if p["is_default"]]
+        assert len(defaults) == 1
+        assert defaults[0]["id"] == second_id
+
+    async def test_update_profile_not_found(self, client: AsyncClient, test_user: User):
         headers = await auth_headers(client, "test@example.com", "testpassword123")
         resp = await client.patch(
             f"/api/v1/brand-profiles/{uuid.uuid4()}",
@@ -126,13 +149,9 @@ class TestDeleteBrandProfile:
         list_resp = await client.get("/api/v1/brand-profiles", headers=headers)
         assert list_resp.json() == []
 
-    async def test_delete_profile_not_found(
-        self, client: AsyncClient, test_user: User
-    ):
+    async def test_delete_profile_not_found(self, client: AsyncClient, test_user: User):
         headers = await auth_headers(client, "test@example.com", "testpassword123")
-        resp = await client.delete(
-            f"/api/v1/brand-profiles/{uuid.uuid4()}", headers=headers
-        )
+        resp = await client.delete(f"/api/v1/brand-profiles/{uuid.uuid4()}", headers=headers)
         assert resp.status_code == 404
 
 
