@@ -262,6 +262,31 @@ class TestUpdateAgentPage:
         )
         assert resp.status_code == 200
 
+    async def test_update_all_optional_fields(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant, db_session: AsyncSession,
+    ):
+        """Cover photo_url, phone, email_display, is_active, and theme updates."""
+        page = await _create_agent_page(db_session, test_tenant, test_user)
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        resp = await client.patch(
+            f"/api/v1/agent-pages/{page.id}",
+            headers=headers,
+            json={
+                "photo_url": "https://example.com/new-photo.jpg",
+                "phone": "555-9999",
+                "email_display": "new@example.com",
+                "is_active": False,
+                "theme": {"primary_color": "#ff0000"},
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["photo_url"] == "https://example.com/new-photo.jpg"
+        assert data["phone"] == "555-9999"
+        assert data["email_display"] == "new@example.com"
+        assert data["is_active"] is False
+        assert data["theme"]["primary_color"] == "#ff0000"
+
     async def test_agent_cannot_update_other_page(
         self, client: AsyncClient, test_user: User, test_tenant: Tenant, db_session: AsyncSession,
     ):

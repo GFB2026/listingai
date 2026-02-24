@@ -18,8 +18,8 @@ ListingAI is a multi-tenant SaaS platform that generates AI-powered real estate 
 ## Testing
 
 ### Backend
-- **373 tests** across 35 test files, all passing
-- **87% code coverage** (2676/3081 statements) — CI gate is 60%
+- **393 tests** across 37 test files, all passing
+- **97% code coverage** — CI gate is 60%
 - Tests use mocked external services (no real API keys, Stripe, S3, or MLS calls)
 - `asyncio_mode = "auto"` with `asyncio_default_fixture_loop_scope = "function"` — async tests auto-detected
 - Coverage report: `cd backend && pytest --cov=app --cov-report=term-missing`

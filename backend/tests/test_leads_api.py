@@ -168,6 +168,30 @@ class TestListLeads:
         assert data["total"] == 1
         assert data["leads"][0]["first_name"] == "AgentLead"
 
+    async def test_list_leads_filter_by_agent_id(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant, db_session: AsyncSession,
+    ):
+        """Admin can filter leads by agent_id parameter."""
+        page = await _agent_page(db_session, test_tenant, test_user)
+        await _lead(db_session, test_tenant, test_user, page, first_name="AdminLead")
+
+        # Create agent with their own lead
+        agent = await _agent_user(db_session, test_tenant)
+        agent_pg = AgentPage(
+            tenant_id=test_tenant.id, user_id=agent.id, slug="filter-agent", theme={},
+        )
+        db_session.add(agent_pg)
+        await db_session.flush()
+        await _lead(db_session, test_tenant, agent, agent_pg, first_name="AgentLead")
+
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        resp = await client.get(
+            "/api/v1/leads", headers=headers, params={"agent_id": str(agent.id)},
+        )
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["leads"][0]["first_name"] == "AgentLead"
+
     async def test_list_leads_unauthorized(self, client: AsyncClient):
         resp = await client.get("/api/v1/leads")
         assert resp.status_code in (401, 403)
@@ -255,6 +279,28 @@ class TestUpdateLead:
         assert resp.status_code == 200
         assert resp.json()["first_name"] == "Johnny"
         assert resp.json()["phone"] == "555-9999"
+
+    async def test_update_all_contact_fields(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant, db_session: AsyncSession,
+    ):
+        """Cover last_name, email, and property_interest update paths."""
+        page = await _agent_page(db_session, test_tenant, test_user)
+        lead = await _lead(db_session, test_tenant, test_user, page)
+        headers = await auth_headers(client, "test@example.com", "testpassword123")
+        resp = await client.patch(
+            f"/api/v1/leads/{lead.id}",
+            headers=headers,
+            json={
+                "last_name": "Smith",
+                "email": "updated@example.com",
+                "property_interest": "3BR condo near beach",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["last_name"] == "Smith"
+        assert data["email"] == "updated@example.com"
+        assert data["property_interest"] == "3BR condo near beach"
 
     async def test_update_invalid_status(
         self, client: AsyncClient, test_user: User, test_tenant: Tenant, db_session: AsyncSession,
