@@ -88,6 +88,7 @@ async def generate_content(
                 tone=request.tone,
                 brand_profile_id=request.brand_profile_id,
                 instructions=request.instructions,
+                event_details=request.event_details or "",
                 tenant_id=str(user.tenant_id),
                 db=db,
             )

@@ -29,26 +29,34 @@ class PropertyAdapter:
 
         # Build address
         address_parts = [
-            reso_data.get("StreetNumber", ""),
-            reso_data.get("StreetDirPrefix", ""),
-            reso_data.get("StreetName", ""),
-            reso_data.get("StreetSuffix", ""),
-            reso_data.get("UnitNumber", ""),
+            str(reso_data.get("StreetNumber", "") or ""),
+            str(reso_data.get("StreetDirPrefix", "") or ""),
+            str(reso_data.get("StreetName", "") or ""),
+            str(reso_data.get("StreetSuffix", "") or ""),
+            str(reso_data.get("UnitNumber", "") or ""),
         ]
         address_street = " ".join(p for p in address_parts if p).strip()
-        city = reso_data.get("City", "")
-        state = reso_data.get("StateOrProvince", "")
-        zip_code = reso_data.get("PostalCode", "")
+        city = str(reso_data.get("City", "") or "")
+        state = str(reso_data.get("StateOrProvince", "") or "")
+        zip_code = str(reso_data.get("PostalCode", "") or "")
         address_full = f"{address_street}, {city}, {state} {zip_code}".strip(", ")
 
         # Parse list date
         list_date = None
         if reso_data.get("ListingContractDate"):
             with contextlib.suppress(ValueError, TypeError):
-                list_date = date.fromisoformat(reso_data["ListingContractDate"][:10])
+                list_date = date.fromisoformat(str(reso_data["ListingContractDate"])[:10])
+
+        # Parse close date
+        close_date = None
+        if reso_data.get("CloseDate"):
+            with contextlib.suppress(ValueError, TypeError):
+                close_date = date.fromisoformat(str(reso_data["CloseDate"])[:10])
 
         return {
-            "mls_listing_id": reso_data.get("ListingKey") or reso_data.get("ListingId"),
+            "mls_listing_id": str(
+                reso_data.get("ListingKey") or reso_data.get("ListingId") or ""
+            ),
             "status": _map_status(reso_data.get("StandardStatus", "")),
             "property_type": _map_property_type(reso_data.get("PropertyType", "")),
             "address_full": address_full,
@@ -58,7 +66,9 @@ class PropertyAdapter:
             "address_zip": zip_code,
             "price": reso_data.get("ListPrice"),
             "bedrooms": reso_data.get("BedroomsTotal"),
-            "bathrooms": reso_data.get("BathroomsTotalDecimal") or reso_data.get("BathroomsFull"),
+            "bathrooms": (
+                reso_data.get("BathroomsTotalDecimal") or reso_data.get("BathroomsFull")
+            ),
             "sqft": reso_data.get("LivingArea"),
             "lot_sqft": reso_data.get("LotSizeSquareFeet"),
             "year_built": reso_data.get("YearBuilt"),
@@ -68,6 +78,13 @@ class PropertyAdapter:
             "longitude": reso_data.get("Longitude"),
             "list_date": list_date,
             "listing_agent_name": reso_data.get("ListAgentFullName"),
+            # Agent contact fields (ported from gor-marketing)
+            "listing_agent_email": reso_data.get("ListAgentEmail"),
+            "listing_agent_phone": reso_data.get("ListAgentDirectPhone"),
+            # Sale metadata (ported from gor-marketing — needed for just_sold/price_reduction)
+            "previous_price": reso_data.get("PreviousListPrice"),
+            "close_price": reso_data.get("ClosePrice"),
+            "close_date": close_date,
             "raw_mls_data": reso_data,
         }
 

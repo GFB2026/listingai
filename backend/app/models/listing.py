@@ -36,6 +36,13 @@ class Listing(Base, TenantMixin, TimestampMixin):
     list_date = Column(Date)
     listing_agent_name = Column(String(255))
     listing_agent_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    # Agent contact fields (ported from gor-marketing — used in email sign-offs and notifications)
+    listing_agent_email = Column(String(255))
+    listing_agent_phone = Column(String(30))
+    # Sale metadata (ported from gor-marketing — needed for price_reduction and just_sold events)
+    previous_price = Column(Numeric(12, 2))
+    close_price = Column(Numeric(12, 2))
+    close_date = Column(Date)
     raw_mls_data = Column(JSONB)
     last_synced_at = Column(DateTime(timezone=True))
 

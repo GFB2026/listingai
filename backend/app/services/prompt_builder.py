@@ -5,6 +5,11 @@ from app.prompts.email_campaign import (
     EMAIL_JUST_LISTED_SYSTEM,
     EMAIL_OPEN_HOUSE_SYSTEM,
 )
+from app.prompts.events import (
+    JUST_SOLD_SYSTEM,
+    OPEN_HOUSE_INVITE_SYSTEM,
+    PRICE_REDUCTION_SYSTEM,
+)
 from app.prompts.flyer_copy import FLYER_SYSTEM
 from app.prompts.listing_description import LISTING_DESCRIPTION_SYSTEM
 from app.prompts.social_media import (
@@ -26,6 +31,10 @@ SYSTEM_PROMPTS = {
     "email_drip": EMAIL_DRIP_SYSTEM,
     "flyer": FLYER_SYSTEM,
     "video_script": VIDEO_SCRIPT_SYSTEM,
+    # Event-specific content types (ported from gor-marketing)
+    "open_house_invite": OPEN_HOUSE_INVITE_SYSTEM,
+    "price_reduction": PRICE_REDUCTION_SYSTEM,
+    "just_sold": JUST_SOLD_SYSTEM,
 }
 
 
@@ -39,10 +48,12 @@ class PromptBuilder:
         tone: str,
         brand_profile: BrandProfile | None = None,
         instructions: str | None = None,
+        event_details: str = "",
     ) -> tuple[str, str]:
         # Layer 1: System prompt (per content type)
         system = SYSTEM_PROMPTS.get(content_type, LISTING_DESCRIPTION_SYSTEM)
         system = system.replace("{tone}", tone)
+        system = system.replace("{event_details}", event_details)
 
         # Layer 2: Brand voice injection
         if brand_profile:
@@ -95,4 +106,8 @@ class PromptBuilder:
             parts.append(f"Original Description: {listing.description_original}")
         if listing.listing_agent_name:
             parts.append(f"Listing Agent: {listing.listing_agent_name}")
+        if getattr(listing, "listing_agent_email", None):
+            parts.append(f"Agent Email: {listing.listing_agent_email}")
+        if getattr(listing, "listing_agent_phone", None):
+            parts.append(f"Agent Phone: {listing.listing_agent_phone}")
         return "\n".join(parts)

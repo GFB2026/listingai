@@ -16,6 +16,10 @@ class ContentType(StrEnum):
     EMAIL_DRIP = "email_drip"
     FLYER = "flyer"
     VIDEO_SCRIPT = "video_script"
+    # Event-specific content types
+    OPEN_HOUSE_INVITE = "open_house_invite"
+    PRICE_REDUCTION = "price_reduction"
+    JUST_SOLD = "just_sold"
 
 
 class Tone(StrEnum):
@@ -32,6 +36,7 @@ class ContentGenerateRequest(BaseModel):
     tone: Tone = Tone.PROFESSIONAL
     brand_profile_id: str | None = None
     instructions: str | None = Field(default=None, max_length=2000)
+    event_details: str | None = Field(default=None, max_length=2000)
     variants: int = Field(default=1, ge=1, le=5)
 
 

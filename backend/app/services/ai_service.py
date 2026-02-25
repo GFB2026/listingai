@@ -1,3 +1,4 @@
+import re
 import time
 from uuid import UUID
 
@@ -34,6 +35,10 @@ MODEL_MAP = {
     "email_drip": "claude-sonnet-4-5-20250929",
     "flyer": "claude-sonnet-4-5-20250929",
     "video_script": "claude-sonnet-4-5-20250929",
+    # Event types
+    "open_house_invite": "claude-sonnet-4-5-20250929",
+    "price_reduction": "claude-sonnet-4-5-20250929",
+    "just_sold": "claude-sonnet-4-5-20250929",
 }
 
 # --- Circuit Breaker ---
@@ -97,6 +102,21 @@ _circuit = _CircuitBreaker()
 _API_TIMEOUT = httpx.Timeout(connect=10.0, read=90.0, write=10.0, pool=10.0)
 
 
+def _scrub_avoid_words(text: str, avoid_words: list[str]) -> str:
+    """Remove banned words/phrases that slip through prompt instructions.
+
+    Uses case-insensitive whole-word matching. Removes the word and cleans
+    up any doubled spaces left behind. Ported from gor-marketing.
+    """
+    for word in avoid_words:
+        pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+        text = pattern.sub("", text)
+    # Collapse multiple spaces and trim lines
+    text = re.sub(r"  +", " ", text)
+    text = "\n".join(line.rstrip() for line in text.split("\n"))
+    return text
+
+
 class AIService:
     def __init__(self):
         settings = get_settings()
@@ -116,6 +136,7 @@ class AIService:
         instructions: str | None,
         tenant_id: str,
         db: AsyncSession,
+        event_details: str = "",
     ) -> dict:
         # Load brand profile if specified
         brand_profile = None
@@ -144,6 +165,7 @@ class AIService:
             tone=tone,
             brand_profile=brand_profile,
             instructions=instructions,
+            event_details=event_details,
         )
 
         # Select model
@@ -183,6 +205,11 @@ class AIService:
             raise
 
         body = response.content[0].text
+
+        # Post-generation filtering: scrub avoid_words that slipped through prompts
+        if brand_profile and brand_profile.avoid_words:
+            body = _scrub_avoid_words(body, brand_profile.avoid_words)
+
         metadata = self._extract_metadata(body, content_type)
 
         return {
