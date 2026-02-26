@@ -520,7 +520,7 @@ def build_flyer_pdf(
     pdf.set_font("Times", "BI", 28)
     pdf.set_text_color(*ACCENT)
     text_w = pdf.get_string_width(branding.headline)
-    pdf.text(x=MARGIN + CONTENT_W - text_w, y=y + _in(0.42), txt=branding.headline)
+    pdf.text(x=MARGIN + CONTENT_W - text_w, y=y + _in(0.42), text=branding.headline)
 
     y += _in(0.75)
 
@@ -537,7 +537,7 @@ def build_flyer_pdf(
         pdf.set_text_color(*MID_GREY)
         placeholder = "[ HERO PHOTO ]"
         pw = pdf.get_string_width(placeholder)
-        pdf.text(x=MARGIN + (CONTENT_W - pw) / 2, y=y + hero_h / 2 + 2, txt=placeholder)
+        pdf.text(x=MARGIN + (CONTENT_W - pw) / 2, y=y + hero_h / 2 + 2, text=placeholder)
 
     # Address overlay
     address = _sanitize_text(listing_data.get("address_full", ""))
@@ -546,7 +546,7 @@ def build_flyer_pdf(
     pdf.rect(MARGIN, y, CONTENT_W, addr_bar_h, style="F")
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(*WHITE)
-    pdf.text(x=MARGIN + _in(0.15), y=y + addr_bar_h - _in(0.1), txt=address)
+    pdf.text(x=MARGIN + _in(0.15), y=y + addr_bar_h - _in(0.1), text=address)
 
     y += hero_h + _in(0.1)
 
@@ -572,7 +572,7 @@ def build_flyer_pdf(
     pdf.set_font("Helvetica", "B", 12)
     pdf.set_text_color(*WHITE)
     sw = pdf.get_string_width(specs_text)
-    pdf.text(x=MARGIN + (CONTENT_W - sw) / 2, y=y + specs_bar_h - _in(0.1), txt=specs_text)
+    pdf.text(x=MARGIN + (CONTENT_W - sw) / 2, y=y + specs_bar_h - _in(0.1), text=specs_text)
     y += _in(0.5)
 
     # Feature checklist
@@ -587,10 +587,10 @@ def build_flyer_pdf(
         pdf.set_text_color(*DARK_GREY)
         for i, feat in enumerate(col1):
             pdf.text(x=MARGIN + _in(0.15), y=y + row_h * i + row_h * 0.7,
-                     txt=_sanitize_text(f"\u00bb  {feat}"))
+                     text=_sanitize_text(f"\u00bb  {feat}"))
         for i, feat in enumerate(col2):
             pdf.text(x=MARGIN + col_w + _in(0.15), y=y + row_h * i + row_h * 0.7,
-                     txt=_sanitize_text(f"\u00bb  {feat}"))
+                     text=_sanitize_text(f"\u00bb  {feat}"))
         y += row_h * max(len(col1), len(col2)) + _in(0.1)
 
     # Body copy
@@ -602,7 +602,7 @@ def build_flyer_pdf(
     pdf.set_font("Times", "I", 10)
     pdf.set_text_color(*DARK_GREY)
     pdf.set_xy(MARGIN + _in(0.4), y)
-    pdf.multi_cell(w=CONTENT_W - _in(0.8), h=5.5, txt=_sanitize_text(body), align="C")
+    pdf.multi_cell(w=CONTENT_W - _in(0.8), h=5.5, text=_sanitize_text(body), align="C")
     y = pdf.get_y() + _in(0.08)
 
     pdf.set_fill_color(*LIGHT_GREY)
@@ -624,23 +624,23 @@ def build_flyer_pdf(
     scan_text = "Scan for Details"
     scan_w = pdf.get_string_width(scan_text)
     pdf.text(x=MARGIN + _in(0.1) + qr_size / 2 - scan_w / 2,
-             y=y + qr_size + _in(0.12), txt=scan_text)
+             y=y + qr_size + _in(0.12), text=scan_text)
 
     agent_x = MARGIN + _in(1.5)
     if agent_name:
         pdf.set_font("Times", "BI", 13)
         pdf.set_text_color(*BLACK)
-        pdf.text(x=agent_x, y=y + _in(0.2), txt=agent_name)
+        pdf.text(x=agent_x, y=y + _in(0.2), text=agent_name)
 
     pdf.set_font("Helvetica", "", 8.5)
     pdf.set_text_color(*MID_GREY)
-    pdf.text(x=agent_x, y=y + _in(0.42), txt=_sanitize_text(branding.brokerage_name))
+    pdf.text(x=agent_x, y=y + _in(0.42), text=_sanitize_text(branding.brokerage_name))
 
     contact_parts = [p for p in [agent_phone, agent_email] if p]
     if contact_parts:
         pdf.set_font("Helvetica", "B", 8.5)
         pdf.set_text_color(*DARK_GREY)
-        pdf.text(x=agent_x, y=y + _in(0.6), txt="  |  ".join(contact_parts))
+        pdf.text(x=agent_x, y=y + _in(0.6), text="  |  ".join(contact_parts))
 
     if branding.has_logo:
         pdf.image(branding.logo_path, x=PAGE_W - MARGIN - _in(1.6),
@@ -659,21 +659,21 @@ def build_flyer_pdf(
     pdf.set_font("Helvetica", "B", fs)
     pdf.set_text_color(*BLACK)
     tagline = _sanitize_text(branding.tagline or branding.brokerage_name)
-    pdf.text(x=MARGIN, y=y + 3.5, txt=tagline)
+    pdf.text(x=MARGIN, y=y + 3.5, text=tagline)
 
     if branding.brokerage_address:
         pdf.set_font("Helvetica", "", fs)
         for i, line in enumerate(branding.brokerage_address.split("\n")[:3]):
             lw = pdf.get_string_width(line)
             pdf.text(x=MARGIN + col_w + (col_w - lw) / 2,
-                     y=y + 3.0 + i * (fs * 0.42), txt=_sanitize_text(line))
+                     y=y + 3.0 + i * (fs * 0.42), text=_sanitize_text(line))
 
     pdf.set_font("Helvetica", "B", fs)
     right_lines = [l for l in [branding.brokerage_phone, branding.brokerage_website] if l]
     for i, line in enumerate(right_lines):
         lw = pdf.get_string_width(line)
         pdf.text(x=MARGIN + 2 * col_w + (col_w - lw),
-                 y=y + 3.5 + i * (fs * 0.42), txt=_sanitize_text(line))
+                 y=y + 3.5 + i * (fs * 0.42), text=_sanitize_text(line))
 
     buf = io.BytesIO()
     pdf.output(buf)
