@@ -4,12 +4,19 @@ from html import escape as html_escape
 from fastapi.responses import StreamingResponse
 
 from app.models.content import Content
+from app.models.listing import Listing
 
-_ALLOWED_FORMATS = {"txt", "html", "docx", "pdf"}
+_ALLOWED_FORMATS = {"txt", "html", "docx", "pdf", "pptx", "flyer_pdf"}
 
 
 class ExportService:
-    async def export(self, content: Content, format: str) -> StreamingResponse:
+    async def export(
+        self,
+        content: Content,
+        format: str,
+        listing: Listing | None = None,
+        branding_settings: dict | None = None,
+    ) -> StreamingResponse:
         if format not in _ALLOWED_FORMATS:
             raise ValueError(
                 f"Unsupported format: {format}. "
@@ -21,6 +28,8 @@ class ExportService:
             return self._export_html(content)
         elif format == "docx":
             return await self._export_docx(content)
+        elif format in ("pptx", "flyer_pdf"):
+            return await self._export_flyer(content, format, listing, branding_settings)
         else:
             return await self._export_pdf(content)
 
@@ -94,3 +103,54 @@ h1 {{ color: #1a365d; }}
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="content-{content.id}.pdf"'},
         )
+
+    async def _export_flyer(
+        self,
+        content: Content,
+        format: str,
+        listing: Listing | None,
+        branding_settings: dict | None,
+    ) -> StreamingResponse:
+        from app.services.flyer_service import BrandingConfig, FlyerService
+
+        if not listing:
+            raise ValueError("Flyer export requires a listing. Content has no associated listing.")
+
+        branding = BrandingConfig.from_settings(branding_settings or {})
+        service = FlyerService(branding)
+
+        listing_data = {
+            "address_full": listing.address_full or "",
+            "price": float(listing.price) if listing.price else None,
+            "bedrooms": listing.bedrooms,
+            "bathrooms": float(listing.bathrooms) if listing.bathrooms else None,
+            "sqft": listing.sqft,
+            "lot_sqft": listing.lot_sqft,
+            "year_built": listing.year_built,
+            "features": listing.features or [],
+            "listing_agent_name": listing.listing_agent_name or "",
+            "listing_agent_email": listing.listing_agent_email or "",
+            "listing_agent_phone": listing.listing_agent_phone or "",
+            "property_type": listing.property_type or "",
+        }
+
+        if format == "pptx":
+            buffer = service.generate_pptx(listing_data, content.body)
+            buffer.seek(0)
+            return StreamingResponse(
+                buffer,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={
+                    "Content-Disposition": f'attachment; filename="flyer-{content.id}.pptx"'
+                },
+            )
+        else:
+            buffer = service.generate_pdf(listing_data, content.body)
+            buffer.seek(0)
+            return StreamingResponse(
+                buffer,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="flyer-{content.id}.pdf"'
+                },
+            )

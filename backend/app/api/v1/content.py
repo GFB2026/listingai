@@ -280,6 +280,7 @@ async def export_content(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
+    from app.models.tenant import Tenant
     from app.services.export_service import ExportService
 
     result = await db.execute(
@@ -292,9 +293,37 @@ async def export_content(
     if not item:
         raise HTTPException(status_code=404, detail="Content not found")
 
+    # Flyer formats need the listing and branding config
+    listing = None
+    branding_settings = None
+    if format in ("pptx", "flyer_pdf"):
+        if item.listing_id:
+            listing_result = await db.execute(
+                select(Listing).where(Listing.id == item.listing_id)
+            )
+            listing = listing_result.scalar_one_or_none()
+
+        # Try brand profile first, fall back to tenant settings
+        if item.brand_profile_id:
+            bp_result = await db.execute(
+                select(BrandProfile).where(BrandProfile.id == item.brand_profile_id)
+            )
+            bp = bp_result.scalar_one_or_none()
+            if bp and bp.settings:
+                branding_settings = bp.settings
+        if not branding_settings:
+            tenant_result = await db.execute(
+                select(Tenant).where(Tenant.id == user.tenant_id)
+            )
+            tenant = tenant_result.scalar_one_or_none()
+            if tenant and tenant.settings:
+                branding_settings = tenant.settings
+
     export_service = ExportService()
     try:
-        return await export_service.export(item, format)
+        return await export_service.export(
+            item, format, listing=listing, branding_settings=branding_settings
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

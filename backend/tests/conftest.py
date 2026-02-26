@@ -16,11 +16,13 @@ from app.models.agent_page import AgentPage  # noqa: F401
 from app.models.brand_profile import BrandProfile
 from app.models.content import Content
 from app.models.content_version import ContentVersion  # noqa: F401
+from app.models.email_campaign import EmailCampaign  # noqa: F401
 from app.models.lead import Lead  # noqa: F401
 from app.models.lead_activity import LeadActivity  # noqa: F401
 from app.models.listing import Listing
 from app.models.mls_connection import MLSConnection  # noqa: F401
 from app.models.page_visit import PageVisit  # noqa: F401
+from app.models.social_post import SocialPost  # noqa: F401
 from app.models.tenant import Tenant
 from app.models.usage_event import UsageEvent  # noqa: F401
 from app.models.user import User

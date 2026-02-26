@@ -7,11 +7,13 @@ from app.api.v1 import (
     billing,
     brand_profiles,
     content,
+    email_campaigns,
     leads,
     listings,
     media,
     mls_connections,
     public,
+    social,
     tenants,
     users,
     webhooks,
@@ -37,3 +39,7 @@ api_router.include_router(
     agent_pages.router, prefix="/agent-pages", tags=["Agent Pages"]
 )
 api_router.include_router(public.router, prefix="/public", tags=["Public"])
+api_router.include_router(social.router, prefix="/social", tags=["Social"])
+api_router.include_router(
+    email_campaigns.router, prefix="/email-campaigns", tags=["Email Campaigns"]
+)
