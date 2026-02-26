@@ -246,3 +246,153 @@ class TestWebhookEdgeCases:
             )
 
         assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_subscription_updated_changes_plan(
+        self, client: AsyncClient, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """subscription.updated should upgrade/downgrade the tenant's plan."""
+        test_tenant.stripe_customer_id = "cus_upgrade"
+        test_tenant.plan = "starter"
+        test_tenant.monthly_generation_limit = 200
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        event = {
+            "id": "evt_upgrade",
+            "type": "customer.subscription.updated",
+            "data": {
+                "object": {
+                    "id": "sub_upgraded",
+                    "customer": "cus_upgrade",
+                    "items": {
+                        "data": [
+                            {"price": {"id": "price_professional_test"}}
+                        ]
+                    },
+                }
+            },
+        }
+
+        with patch("stripe.Webhook.construct_event", return_value=event), \
+             patch("app.api.v1.webhooks._get_plan_map", return_value={
+                 "price_professional_test": ("professional", 1000),
+             }):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps(event).encode(),
+                headers={"stripe-signature": "valid"},
+            )
+
+        assert response.status_code == 200
+        await db_session.refresh(test_tenant)
+        assert test_tenant.plan == "professional"
+        assert test_tenant.monthly_generation_limit == 1000
+        assert test_tenant.stripe_subscription_id == "sub_upgraded"
+
+    @pytest.mark.asyncio
+    async def test_redis_unavailable_still_processes(
+        self, client: AsyncClient, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """If Redis is down, webhook should still process (no dedup, but no crash)."""
+        test_tenant.stripe_customer_id = "cus_redis_down"
+        test_tenant.plan = "free"
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        event = {
+            "id": "evt_redis_down",
+            "type": "customer.subscription.created",
+            "data": {
+                "object": {
+                    "id": "sub_redis",
+                    "customer": "cus_redis_down",
+                    "items": {"data": [{"price": {"id": "price_starter_t"}}]},
+                }
+            },
+        }
+
+        mock_redis = AsyncMock()
+        mock_redis.exists = AsyncMock(side_effect=ConnectionError("Redis unavailable"))
+
+        with patch("stripe.Webhook.construct_event", return_value=event), \
+             patch("app.api.v1.webhooks.get_redis", new_callable=AsyncMock, return_value=mock_redis), \
+             patch("app.api.v1.webhooks._get_plan_map", return_value={
+                 "price_starter_t": ("starter", 200),
+             }):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps(event).encode(),
+                headers={"stripe-signature": "valid"},
+            )
+
+        assert response.status_code == 200
+        await db_session.refresh(test_tenant)
+        assert test_tenant.plan == "starter"
+
+    @pytest.mark.asyncio
+    async def test_missing_signature_header(self, client: AsyncClient):
+        """Missing stripe-signature header should return 400."""
+        with patch(
+            "stripe.Webhook.construct_event",
+            side_effect=stripe.error.SignatureVerificationError("no sig", ""),
+        ):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=b"{}",
+            )
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_unhandled_event_type_returns_ok(self, client: AsyncClient):
+        """Unknown event types should be accepted but not processed."""
+        event = {
+            "id": "evt_unknown_type",
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "cs_test"}},
+        }
+
+        with patch("stripe.Webhook.construct_event", return_value=event):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps(event).encode(),
+                headers={"stripe-signature": "valid"},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_subscription_with_empty_items(
+        self, client: AsyncClient, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """Subscription event with empty items list should downgrade to free."""
+        test_tenant.stripe_customer_id = "cus_empty_items"
+        test_tenant.plan = "professional"
+        test_tenant.monthly_generation_limit = 1000
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        event = {
+            "id": "evt_empty_items",
+            "type": "customer.subscription.created",
+            "data": {
+                "object": {
+                    "id": "sub_empty",
+                    "customer": "cus_empty_items",
+                    "items": {"data": []},
+                }
+            },
+        }
+
+        with patch("stripe.Webhook.construct_event", return_value=event):
+            response = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps(event).encode(),
+                headers={"stripe-signature": "valid"},
+            )
+
+        assert response.status_code == 200
+        await db_session.refresh(test_tenant)
+        assert test_tenant.plan == "free"
+        assert test_tenant.monthly_generation_limit == 50
