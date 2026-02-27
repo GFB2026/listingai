@@ -9,11 +9,17 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.config import get_settings
 from app.core.database import Base
 from app.models import (  # noqa: F401 - ensure all models are imported
+    AgentPage,
     BrandProfile,
     Content,
     ContentVersion,
+    EmailCampaign,
+    Lead,
+    LeadActivity,
     Listing,
     MLSConnection,
+    PageVisit,
+    SocialPost,
     Tenant,
     UsageEvent,
     User,
