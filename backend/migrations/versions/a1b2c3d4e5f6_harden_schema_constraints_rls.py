@@ -185,9 +185,9 @@ def upgrade() -> None:
     # ---------------------------------------------------------------
     # Using ENABLE (not FORCE) so the table owner (migration user) bypasses RLS.
     # The app user is subject to policies when connecting as a non-owner role.
-    # TODO: Create a restricted `listingai_app` role for the application connection,
-    # then switch to FORCE ROW LEVEL SECURITY for defense-in-depth on the primary
-    # app user as well.
+    # NOTE: The restricted `listingai_app` role is created in migration
+    # g7h8i9j0k1l2 (role + per-table grants + FORCE RLS) and hardened with
+    # database/schema-level grants + default privileges in i9j0k1l2m3n4.
     for table in RLS_TABLES:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
         op.execute(
