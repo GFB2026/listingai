@@ -187,6 +187,41 @@ class TestBridgeProvider:
         assert client.access_token == "server_token_abc"
         await client.close()
 
+    @pytest.mark.asyncio
+    async def test_bridge_auth_does_not_make_http_call(self):
+        """Bridge auth should NOT hit any HTTP endpoint (server token only)."""
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "my_server_token",
+            provider="bridge",
+        )
+        client._client = AsyncMock()
+        client._client.post = AsyncMock()
+
+        await client.authenticate()
+
+        # No HTTP calls should have been made
+        client._client.post.assert_not_called()
+        assert client.access_token == "my_server_token"
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_bridge_token_expiry_set_to_24h(self):
+        """Bridge tokens should get a 24-hour expiry window."""
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "tok",
+            provider="bridge",
+        )
+        before = datetime.now(timezone.utc)
+        await client.authenticate()
+        after = datetime.now(timezone.utc)
+
+        assert client.token_expires_at is not None
+        # Should be approximately 24 hours from now
+        expected_min = before + timedelta(hours=23, minutes=59)
+        expected_max = after + timedelta(hours=24, minutes=1)
+        assert expected_min <= client.token_expires_at <= expected_max
+        await client.close()
+
     def test_bridge_paths_without_dataset(self):
         client = RESOClient(
             "https://api.bridgedataoutput.com", "id", "secret",
@@ -203,6 +238,169 @@ class TestBridgeProvider:
         assert client._property_path == "/api/v2/OData/test/Property"
         assert client._media_path == "/api/v2/OData/test/Media"
 
+    def test_bridge_paths_with_beachesmls_dataset(self):
+        """Test with a real-world dataset name."""
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "secret",
+            provider="bridge", dataset="beachesmls",
+        )
+        assert client._property_path == "/api/v2/OData/beachesmls/Property"
+        assert client._media_path == "/api/v2/OData/beachesmls/Media"
+
+    @pytest.mark.asyncio
+    async def test_bridge_get_properties_uses_correct_url(self):
+        """Verify Bridge API calls go to the correct dataset-qualified URL."""
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "server_token",
+            provider="bridge", dataset="beachesmls",
+        )
+        client._client = AsyncMock()
+        client.access_token = "server_token"
+        client.token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"value": [{"ListingKey": "B1"}]}
+        mock_response.raise_for_status = MagicMock()
+        client._client.get = AsyncMock(return_value=mock_response)
+
+        result = await client.get_properties(filter_query="ListPrice gt 500000")
+
+        call_args = client._client.get.call_args
+        called_url = call_args.args[0] if call_args.args else call_args.kwargs.get("url", "")
+        assert "/api/v2/OData/beachesmls/Property" in called_url
+        assert result["value"][0]["ListingKey"] == "B1"
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_bridge_get_media_uses_correct_url(self):
+        """Verify Bridge media endpoint uses dataset-qualified path."""
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "server_token",
+            provider="bridge", dataset="beachesmls",
+        )
+        client._client = AsyncMock()
+        client.access_token = "server_token"
+        client.token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"value": []}
+        mock_response.raise_for_status = MagicMock()
+        client._client.get = AsyncMock(return_value=mock_response)
+
+        await client.get_media("KEY123")
+
+        call_args = client._client.get.call_args
+        called_url = call_args.args[0] if call_args.args else call_args.kwargs.get("url", "")
+        assert "/api/v2/OData/beachesmls/Media" in called_url
+        await client.close()
+
     def test_unknown_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown MLS provider"):
             RESOClient("https://example.com", "id", "secret", provider="invalid")
+
+    def test_provider_is_case_insensitive(self):
+        """Provider names should be normalized to lowercase."""
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "secret",
+            provider="BRIDGE",
+        )
+        assert client.provider == "bridge"
+        assert client._auth_type == "server_token"
+
+
+class TestBackwardCompatibility:
+    """Verify that existing Trestle-only behavior is not broken."""
+
+    def test_default_provider_is_trestle(self):
+        client = RESOClient("https://api.example.com", "id", "secret")
+        assert client.provider == "trestle"
+        assert client._auth_type == "client_credentials"
+
+    def test_trestle_paths_unchanged(self):
+        client = RESOClient("https://api-trestle.corelogic.com", "id", "secret")
+        assert client._property_path == "/trestle/odata/Property"
+        assert client._media_path == "/trestle/odata/Media"
+        assert client._token_path == "/trestle/oidc/connect/token"
+
+    @pytest.mark.asyncio
+    async def test_trestle_auth_still_uses_oauth(self):
+        """Trestle should still use full OAuth2 client credentials flow."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "access_token": "oauth_tok",
+            "expires_in": 3600,
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        client = RESOClient("https://api-trestle.corelogic.com", "cid", "csecret")
+        client._client = AsyncMock()
+        client._client.post = AsyncMock(return_value=mock_response)
+
+        token = await client.authenticate()
+
+        assert token == "oauth_tok"
+        # Verify OAuth endpoint was called
+        call_args = client._client.post.call_args
+        called_url = call_args.args[0] if call_args.args else call_args.kwargs.get("url", "")
+        assert "/trestle/oidc/connect/token" in called_url
+        # Verify OAuth2 payload
+        call_data = call_args.kwargs.get("data", {})
+        assert call_data["grant_type"] == "client_credentials"
+        assert call_data["client_id"] == "cid"
+        assert call_data["client_secret"] == "csecret"
+        await client.close()
+
+    def test_from_connection_defaults_to_trestle_when_provider_missing(self):
+        """Old connections without provider attribute should default to trestle."""
+        mock_conn = MagicMock(spec=[])  # No attributes by default
+        mock_conn.base_url = "https://api-trestle.corelogic.com"
+        mock_conn.client_id_encrypted = b"enc_id"
+        mock_conn.client_secret_encrypted = b"enc_secret"
+        mock_conn.settings = None
+        # Simulate missing provider attribute (old record)
+        del mock_conn.provider
+
+        with patch(
+            "app.integrations.mls.reso_client.decrypt_value",
+            side_effect=["id", "secret"],
+        ):
+            client = RESOClient.from_connection(mock_conn)
+
+        assert client.provider == "trestle"
+
+    def test_from_connection_handles_none_provider(self):
+        """If provider is explicitly None, should default to trestle."""
+        mock_conn = MagicMock()
+        mock_conn.base_url = "https://api-trestle.corelogic.com"
+        mock_conn.client_id_encrypted = b"enc_id"
+        mock_conn.client_secret_encrypted = b"enc_secret"
+        mock_conn.provider = None
+        mock_conn.settings = None
+
+        with patch(
+            "app.integrations.mls.reso_client.decrypt_value",
+            side_effect=["id", "secret"],
+        ):
+            client = RESOClient.from_connection(mock_conn)
+
+        assert client.provider == "trestle"
+
+    def test_from_connection_bridge_empty_settings(self):
+        """Bridge connection with empty settings dict should use default paths."""
+        mock_conn = MagicMock()
+        mock_conn.base_url = "https://api.bridgedataoutput.com"
+        mock_conn.client_id_encrypted = b"enc_id"
+        mock_conn.client_secret_encrypted = b"enc_secret"
+        mock_conn.provider = "bridge"
+        mock_conn.settings = {}
+
+        with patch(
+            "app.integrations.mls.reso_client.decrypt_value",
+            side_effect=["id", "token"],
+        ):
+            client = RESOClient.from_connection(mock_conn)
+
+        assert client.provider == "bridge"
+        # No dataset, so paths should be the generic ones
+        assert client._property_path == "/api/v2/OData/Property"
+        assert client._media_path == "/api/v2/OData/Media"

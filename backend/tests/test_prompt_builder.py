@@ -219,3 +219,114 @@ class TestListingDataSection:
         )
         assert "LISTING DATA:" in user
         assert "100 Ocean Blvd" in user
+
+
+class TestMarketDataInjection:
+    """Verify market data flows into the user prompt via market_areas parameter."""
+
+    SAMPLE_AREAS = [
+        {
+            "name": "Galt Ocean Mile",
+            "zip_codes": ["33308"],
+            "cities": ["Fort Lauderdale"],
+            "stats": {
+                "median_price": 485000,
+                "median_price_yoy": 4.2,
+                "median_dom": 52,
+                "months_supply": 5.8,
+                "avg_price_per_sqft": 385,
+            },
+        },
+        {
+            "name": "default",
+            "stats": {
+                "median_price": 400000,
+                "median_dom": 50,
+            },
+        },
+    ]
+
+    def test_market_data_injected_by_zip(self):
+        """Listing zip matches area -- market context appears in user prompt."""
+        builder = PromptBuilder()
+        listing = _mock_listing(address_zip="33308", address_city="Fort Lauderdale")
+        _, user = builder.build(
+            listing=listing,
+            content_type="listing_description",
+            tone="professional",
+            market_areas=self.SAMPLE_AREAS,
+        )
+        assert "MARKET CONTEXT:" in user
+        assert "$485,000" in user
+        assert "4.2%" in user
+        assert "Galt Ocean Mile" in user
+
+    def test_market_data_default_fallback(self):
+        """Listing with unknown zip/city falls back to default area."""
+        builder = PromptBuilder()
+        listing = _mock_listing(
+            address_full="999 Unknown St, Nowhere, FL 99999",
+            address_zip="99999",
+            address_city="Nowhere",
+        )
+        _, user = builder.build(
+            listing=listing,
+            content_type="social_instagram",
+            tone="luxury",
+            market_areas=self.SAMPLE_AREAS,
+        )
+        assert "MARKET CONTEXT:" in user
+        assert "$400,000" in user
+
+    def test_no_market_areas_no_section(self):
+        """When market_areas is None, no market section appears."""
+        builder = PromptBuilder()
+        listing = _mock_listing()
+        _, user = builder.build(
+            listing=listing,
+            content_type="listing_description",
+            tone="professional",
+            market_areas=None,
+        )
+        assert "MARKET CONTEXT:" not in user
+
+    def test_empty_market_areas_no_section(self):
+        """When market_areas is empty list, no market section appears."""
+        builder = PromptBuilder()
+        listing = _mock_listing()
+        _, user = builder.build(
+            listing=listing,
+            content_type="listing_description",
+            tone="professional",
+            market_areas=[],
+        )
+        assert "MARKET CONTEXT:" not in user
+
+    def test_market_section_before_instructions(self):
+        """Market section should appear before ADDITIONAL INSTRUCTIONS."""
+        builder = PromptBuilder()
+        listing = _mock_listing(address_zip="33308")
+        _, user = builder.build(
+            listing=listing,
+            content_type="listing_description",
+            tone="professional",
+            market_areas=self.SAMPLE_AREAS,
+            instructions="Focus on the view.",
+        )
+        market_pos = user.index("MARKET CONTEXT:")
+        instructions_pos = user.index("ADDITIONAL INSTRUCTIONS:")
+        assert market_pos < instructions_pos
+
+    def test_market_data_with_event_content_type(self):
+        """Market data should work with event content types too."""
+        builder = PromptBuilder()
+        listing = _mock_listing(address_zip="33308")
+        _, user = builder.build(
+            listing=listing,
+            content_type="open_house_invite",
+            tone="professional",
+            event_details="Sunday March 1, 1-4 PM",
+            market_areas=self.SAMPLE_AREAS,
+        )
+        assert "MARKET CONTEXT:" in user
+        assert "$485,000" in user

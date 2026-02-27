@@ -278,6 +278,180 @@ class TestExtractMetadata:
         assert "hashtags" not in meta
 
 
+class TestMarketDataInGenerate:
+    """Test that tenant market data flows through AIService.generate into prompts."""
+
+    def _mock_listing(self):
+        listing = MagicMock(spec=Listing)
+        listing.address_full = "100 Ocean Blvd, Fort Lauderdale, FL 33308"
+        listing.address_city = "Fort Lauderdale"
+        listing.address_zip = "33308"
+        listing.county = None
+        listing.price = 1000000
+        listing.bedrooms = 3
+        listing.bathrooms = 2
+        listing.sqft = 2000
+        listing.property_type = "condo"
+        listing.year_built = 2020
+        listing.features = ["Pool"]
+        listing.description_original = "Nice condo"
+        listing.listing_agent_name = "Agent"
+        listing.listing_agent_email = None
+        listing.listing_agent_phone = None
+        return listing
+
+    def _mock_response(self, text="Generated content here"):
+        resp = MagicMock()
+        resp.content = [MagicMock(text=text)]
+        resp.usage = MagicMock(input_tokens=100, output_tokens=50)
+        return resp
+
+    @pytest.mark.asyncio
+    async def test_generate_includes_market_data_from_tenant_settings(
+        self, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """When tenant has market_data in settings, it should be passed to prompt builder."""
+        # Set market data on tenant
+        test_tenant.settings = {
+            "market_data": {
+                "areas": [
+                    {
+                        "name": "Beach Zone",
+                        "zip_codes": ["33308"],
+                        "stats": {
+                            "median_price": 500000,
+                            "median_dom": 45,
+                            "months_supply": 3.5,
+                        },
+                    }
+                ]
+            }
+        }
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        listing = self._mock_listing()
+        mock_resp = self._mock_response()
+
+        with patch("app.services.ai_service.get_settings") as mock_settings:
+            mock_settings.return_value.anthropic_api_key = "sk-test"
+            service = AIService()
+            service.client = MagicMock()
+            service.client.messages = MagicMock()
+            service.client.messages.create = AsyncMock(return_value=mock_resp)
+
+            from app.services.ai_service import _circuit
+            _circuit._state = "closed"
+            _circuit._failure_count = 0
+
+            # Spy on prompt builder to verify market_areas is passed
+            original_build = service.prompt_builder.build
+            build_calls = []
+
+            def capture_build(*args, **kwargs):
+                build_calls.append(kwargs)
+                return original_build(*args, **kwargs)
+
+            service.prompt_builder.build = capture_build
+
+            result = await service.generate(
+                listing=listing,
+                content_type="listing_description",
+                tone="professional",
+                brand_profile_id=None,
+                instructions=None,
+                tenant_id=str(test_tenant.id),
+                db=db_session,
+            )
+
+        assert result["body"] == "Generated content here"
+        assert len(build_calls) == 1
+        assert build_calls[0]["market_areas"] is not None
+        assert len(build_calls[0]["market_areas"]) == 1
+        assert build_calls[0]["market_areas"][0]["name"] == "Beach Zone"
+
+        # Verify the API was called with market context in the user prompt
+        call_kwargs = service.client.messages.create.call_args[1]
+        user_message = call_kwargs["messages"][0]["content"]
+        assert "MARKET CONTEXT:" in user_message
+        assert "$500,000" in user_message
+
+    @pytest.mark.asyncio
+    async def test_generate_without_market_data_still_works(
+        self, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """When tenant has no market data, generation should proceed normally."""
+        # Ensure tenant has no settings
+        test_tenant.settings = {}
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        listing = self._mock_listing()
+        mock_resp = self._mock_response()
+
+        with patch("app.services.ai_service.get_settings") as mock_settings:
+            mock_settings.return_value.anthropic_api_key = "sk-test"
+            service = AIService()
+            service.client = MagicMock()
+            service.client.messages = MagicMock()
+            service.client.messages.create = AsyncMock(return_value=mock_resp)
+
+            from app.services.ai_service import _circuit
+            _circuit._state = "closed"
+            _circuit._failure_count = 0
+
+            result = await service.generate(
+                listing=listing,
+                content_type="listing_description",
+                tone="professional",
+                brand_profile_id=None,
+                instructions=None,
+                tenant_id=str(test_tenant.id),
+                db=db_session,
+            )
+
+        assert result["body"] == "Generated content here"
+        # Verify no market context in the prompt
+        call_kwargs = service.client.messages.create.call_args[1]
+        user_message = call_kwargs["messages"][0]["content"]
+        assert "MARKET CONTEXT:" not in user_message
+
+    @pytest.mark.asyncio
+    async def test_generate_with_null_tenant_settings(
+        self, db_session: AsyncSession, test_tenant: Tenant
+    ):
+        """When tenant.settings is None, generation should proceed normally."""
+        test_tenant.settings = None
+        db_session.add(test_tenant)
+        await db_session.flush()
+
+        listing = self._mock_listing()
+        mock_resp = self._mock_response()
+
+        with patch("app.services.ai_service.get_settings") as mock_settings:
+            mock_settings.return_value.anthropic_api_key = "sk-test"
+            service = AIService()
+            service.client = MagicMock()
+            service.client.messages = MagicMock()
+            service.client.messages.create = AsyncMock(return_value=mock_resp)
+
+            from app.services.ai_service import _circuit
+            _circuit._state = "closed"
+            _circuit._failure_count = 0
+
+            result = await service.generate(
+                listing=listing,
+                content_type="listing_description",
+                tone="professional",
+                brand_profile_id=None,
+                instructions=None,
+                tenant_id=str(test_tenant.id),
+                db=db_session,
+            )
+
+        assert result["body"] == "Generated content here"
+
+
 class TestCircuitBreakerHalfOpen:
     def test_half_open_blocks_second_request(self):
         cb = _CircuitBreaker(threshold=2, recovery=1)

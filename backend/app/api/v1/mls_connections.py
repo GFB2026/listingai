@@ -54,6 +54,7 @@ async def create_connection(
         client_id_encrypted=encrypt_value(request.client_id),
         client_secret_encrypted=encrypt_value(request.client_secret),
         sync_enabled=request.sync_enabled,
+        settings=request.settings or {},
     )
     db.add(connection)
     await db.flush()
@@ -88,6 +89,8 @@ async def update_connection(
         connection.client_secret_encrypted = encrypt_value(request.client_secret)
     if request.sync_enabled is not None:
         connection.sync_enabled = request.sync_enabled
+    if request.settings is not None:
+        connection.settings = request.settings
 
     db.add(connection)
     await db.flush()
@@ -180,6 +183,7 @@ async def get_connection_status(
     return MLSConnectionStatus(
         id=str(connection.id),
         name=connection.name,
+        provider=connection.provider,
         sync_enabled=connection.sync_enabled,
         last_sync_at=connection.last_sync_at,
         sync_watermark=connection.sync_watermark,

@@ -115,3 +115,108 @@ class TestBuildMarketSection:
         }]
         section = build_market_section({"address_zip": "44444"}, areas)
         assert "down 2.3%" in section
+
+
+class TestLookupCascadePriority:
+    """Thorough cascade priority tests: zip > city > county > default."""
+
+    ALL_AREAS = [
+        {"name": "default", "stats": {"median_price": 100000}},
+        {"name": "County Match", "counties": ["Broward"], "stats": {"median_price": 200000}},
+        {"name": "City Match", "cities": ["Fort Lauderdale"], "stats": {"median_price": 300000}},
+        {"name": "Zip Match", "zip_codes": ["33308"], "stats": {"median_price": 400000}},
+    ]
+
+    def test_zip_beats_everything(self):
+        result = lookup(
+            {"address_zip": "33308", "address_city": "Fort Lauderdale", "county": "Broward"},
+            self.ALL_AREAS,
+        )
+        assert result["name"] == "Zip Match"
+
+    def test_city_beats_county_and_default(self):
+        result = lookup(
+            {"address_zip": "99999", "address_city": "Fort Lauderdale", "county": "Broward"},
+            self.ALL_AREAS,
+        )
+        assert result["name"] == "City Match"
+
+    def test_county_beats_default(self):
+        result = lookup(
+            {"address_zip": "99999", "address_city": "Unknown City", "county": "Broward"},
+            self.ALL_AREAS,
+        )
+        assert result["name"] == "County Match"
+
+    def test_default_when_nothing_matches(self):
+        result = lookup(
+            {"address_zip": "99999", "address_city": "Unknown City", "county": "Unknown County"},
+            self.ALL_AREAS,
+        )
+        assert result["name"] == "default"
+
+    def test_no_county_field_still_works(self):
+        """Listings without county field should gracefully fall through."""
+        result = lookup(
+            {"address_zip": "99999", "address_city": "Unknown City"},
+            self.ALL_AREAS,
+        )
+        assert result["name"] == "default"
+
+    def test_none_values_handled(self):
+        """None values in listing fields should not crash."""
+        result = lookup(
+            {"address_zip": None, "address_city": None, "county": None},
+            self.ALL_AREAS,
+        )
+        assert result["name"] == "default"
+
+
+class TestGetMarketDataConvenience:
+    """Test the tenant settings -> lookup integration pattern."""
+
+    def test_full_flow_tenant_settings_to_market_section(self):
+        """Simulate the full flow: tenant settings -> extract areas -> lookup -> build section."""
+        tenant_settings = {
+            "market_data": {
+                "areas": [
+                    {
+                        "name": "Beach Zone",
+                        "zip_codes": ["33308"],
+                        "stats": {
+                            "median_price": 485000,
+                            "median_dom": 52,
+                            "months_supply": 3.5,
+                        },
+                    },
+                    {
+                        "name": "default",
+                        "stats": {"median_price": 400000},
+                    },
+                ]
+            }
+        }
+        # Extract areas the same way ai_service.py does
+        market_data = tenant_settings.get("market_data", {})
+        market_areas = market_data.get("areas") if isinstance(market_data, dict) else None
+
+        # Listing matches by zip
+        listing_data = {"address_zip": "33308", "address_city": "Fort Lauderdale"}
+        section = build_market_section(listing_data, market_areas)
+        assert "MARKET CONTEXT:" in section
+        assert "$485,000" in section
+        assert "seller's market" in section  # months_supply 3.5 < 4
+
+    def test_tenant_with_no_market_data_key(self):
+        """Tenant settings without market_data key -> empty result."""
+        tenant_settings = {"branding": {"logo": "logo.png"}}
+        market_data = tenant_settings.get("market_data", {})
+        market_areas = market_data.get("areas") if isinstance(market_data, dict) else None
+        assert market_areas is None
+
+    def test_tenant_with_empty_market_data(self):
+        """Tenant settings with empty market_data -> empty result."""
+        tenant_settings = {"market_data": {}}
+        market_data = tenant_settings.get("market_data", {})
+        market_areas = market_data.get("areas") if isinstance(market_data, dict) else None
+        assert market_areas is None

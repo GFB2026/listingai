@@ -69,6 +69,7 @@ class Settings(BaseSettings):
 
     # MLS
     mls_default_base_url: str = "https://api-trestle.corelogic.com"
+    mls_bridge_base_url: str = "https://api.bridgedataoutput.com"
     mls_sync_interval_minutes: int = 30
 
     # Tuning
@@ -95,7 +96,7 @@ class Settings(BaseSettings):
             raise ValueError(f"log_level must be one of {_VALID_LOG_LEVELS}, got '{v}'")
         return v.lower()
 
-    @field_validator("app_url", "frontend_url", "s3_endpoint_url", "mls_default_base_url")
+    @field_validator("app_url", "frontend_url", "s3_endpoint_url", "mls_default_base_url", "mls_bridge_base_url")
     @classmethod
     def check_url_format(cls, v: str) -> str:
         if v and not v.startswith(("http://", "https://")):
