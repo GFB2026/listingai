@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ListingAI — Terraform Variables
+# Copy to terraform.tfvars and fill in real values.
+# DO NOT commit terraform.tfvars — it is in .gitignore.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Required: Generate at https://cloud.digitalocean.com/account/api/tokens
+do_token = "dop_v1_REPLACE_ME"
+
+# Required: SSH key fingerprint registered in your DO account
+# Find via: doctl compute ssh-key list
+ssh_key_fingerprint = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+
+# Required: Spaces access keys (API > Spaces Keys in DO console)
+spaces_access_key = "REPLACE_ME"
+spaces_secret_key = "REPLACE_ME"
+
+# Optional: Override defaults
+# domain       = "listingai.com"
+# region       = "nyc1"
+# droplet_size = "s-2vcpu-4gb"
+# db_size      = "db-s-1vcpu-1gb"
+# github_repo  = "https://github.com/your-org/listingai.git"
+# alert_email  = "greg@gregfredabytes.com"

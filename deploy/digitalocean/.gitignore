@@ -1,0 +1,16 @@
+# Terraform state (contains secrets)
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Real variable values (contains tokens)
+terraform.tfvars
+
+# Generated deployment files (contain credentials)
+.env.generated
+.env.secrets
+
+# Terraform crash logs
+crash.log
+crash.*.log

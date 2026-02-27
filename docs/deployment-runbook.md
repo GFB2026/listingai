@@ -268,3 +268,116 @@ cbe7f3435501 (initial schema)
   → b2c3d4e5f6a7 (performance indexes)
   → c3d4e5f6a7b8 (updated_at columns)
 ```
+
+---
+
+## 10. DigitalOcean Deployment
+
+Infrastructure-as-code for deploying ListingAI on DigitalOcean. All files are in `deploy/digitalocean/`.
+
+### Architecture
+
+| Resource | Service | Size | Monthly Cost |
+|----------|---------|------|-------------|
+| Droplet | Docker host (backend, worker, beat, frontend, nginx) | s-2vcpu-4gb | $24 |
+| Managed PostgreSQL | Primary database | db-s-1vcpu-1gb, PG 16 | $15 |
+| Managed Redis | Cache + Celery broker | db-s-1vcpu-1gb, Redis 7 | $15 |
+| Spaces + CDN | Media storage (S3-compatible) | 250GB included | $5 |
+| **Total** | | | **~$59/mo** |
+
+All managed services communicate over a private VPC (`10.10.10.0/24`). Database firewalls restrict access to the Droplet only.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | Terraform resources (Droplet, Postgres, Redis, Spaces, VPC, Firewall, DNS) |
+| `variables.tf` | Input variables (tokens, region, sizes) |
+| `outputs.tf` | Connection strings, IPs, URLs |
+| `terraform.tfvars.example` | Template for your real values (copy to `terraform.tfvars`) |
+| `cloud-init.yaml` | Server bootstrap (deploy user, Docker Compose, UFW, fail2ban, swap) |
+| `docker-compose.do.yml` | Compose overlay that disables local postgres/redis/minio |
+| `deploy.sh` | Post-provision script (generates .env, deploys stack, runs migrations) |
+
+### Prerequisites
+
+1. [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.5
+2. A DigitalOcean account with:
+   - API token (generate at Account > API > Tokens)
+   - SSH key registered (Account > Security > SSH Keys)
+   - Spaces access keys (API > Spaces Keys)
+3. Domain DNS managed by DigitalOcean (or update NS records to point to DO)
+
+### First-Time Setup
+
+```bash
+cd deploy/digitalocean
+
+# 1. Configure variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your real API token, SSH fingerprint, Spaces keys
+
+# 2. (Optional) Create .env.secrets with application secrets
+cat > .env.secrets << 'EOF'
+APP_SECRET_KEY=<generate with: openssl rand -base64 48>
+ANTHROPIC_API_KEY=sk-ant-...
+JWT_SECRET_KEY=<generate with: openssl rand -base64 48>
+ENCRYPTION_KEY=<generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_STARTER=price_...
+STRIPE_PRICE_ID_PROFESSIONAL=price_...
+STRIPE_PRICE_ID_ENTERPRISE=price_...
+SENDGRID_API_KEY=SG....
+SENTRY_DSN=https://...@sentry.io/...
+EOF
+
+# 3. Provision infrastructure
+terraform init
+terraform plan          # Review what will be created
+terraform apply         # Create everything (~5 min)
+
+# 4. Deploy the application
+chmod +x deploy.sh
+./deploy.sh             # Generates .env, pushes to server, starts stack
+
+# 5. Set up TLS (after DNS is pointing to the Droplet)
+./deploy.sh --tls
+```
+
+### Routine Updates
+
+```bash
+cd deploy/digitalocean
+
+# Code update (git pull + rebuild + migrate + restart)
+./deploy.sh --update
+
+# Regenerate .env only (e.g., after Terraform changes)
+./deploy.sh --env-only
+
+# Check status
+./deploy.sh --status
+```
+
+### Key Differences from Self-Hosted
+
+| Concern | Self-Hosted (`docker-compose.prod.yml`) | DigitalOcean (`docker-compose.do.yml`) |
+|---------|----------------------------------------|---------------------------------------|
+| PostgreSQL | Local container | Managed cluster (auto-backups, failover) |
+| Redis | Local container | Managed cluster (auto-persistence) |
+| Object storage | MinIO container | Spaces + CDN |
+| Backups | `backup` container with pg_dump | DO managed (7-day point-in-time recovery) |
+| TLS to DB/Redis | Plain TCP (localhost) | Required (TLS over private VPC) |
+| Connection strings | `postgresql://...@postgres:5432` | `postgresql://...@private-host:25060?sslmode=require` |
+| Redis protocol | `redis://` | `rediss://` (TLS) |
+
+### Destroying Infrastructure
+
+```bash
+cd deploy/digitalocean
+terraform destroy       # Removes ALL resources — irreversible
+```
+
+> **Warning:** `terraform destroy` deletes the managed database including all data. Ensure you have a backup before destroying.
