@@ -1,6 +1,6 @@
 """Tests for Stripe webhook handlers."""
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import stripe.error
@@ -205,8 +205,17 @@ class TestWebhookEdgeCases:
         mock_redis = AsyncMock()
         mock_redis.exists = AsyncMock(return_value=True)  # already processed
 
-        with patch("stripe.Webhook.construct_event", return_value=event), \
-             patch("app.api.v1.webhooks.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+        with (
+            patch(
+                "stripe.Webhook.construct_event",
+                return_value=event,
+            ),
+            patch(
+                "app.api.v1.webhooks.get_redis",
+                new_callable=AsyncMock,
+                return_value=mock_redis,
+            ),
+        ):
             response = await client.post(
                 "/api/v1/webhooks/stripe",
                 content=json.dumps(event).encode(),
@@ -315,11 +324,23 @@ class TestWebhookEdgeCases:
         mock_redis = AsyncMock()
         mock_redis.exists = AsyncMock(side_effect=ConnectionError("Redis unavailable"))
 
-        with patch("stripe.Webhook.construct_event", return_value=event), \
-             patch("app.api.v1.webhooks.get_redis", new_callable=AsyncMock, return_value=mock_redis), \
-             patch("app.api.v1.webhooks._get_plan_map", return_value={
-                 "price_starter_t": ("starter", 200),
-             }):
+        with (
+            patch(
+                "stripe.Webhook.construct_event",
+                return_value=event,
+            ),
+            patch(
+                "app.api.v1.webhooks.get_redis",
+                new_callable=AsyncMock,
+                return_value=mock_redis,
+            ),
+            patch(
+                "app.api.v1.webhooks._get_plan_map",
+                return_value={
+                    "price_starter_t": ("starter", 200),
+                },
+            ),
+        ):
             response = await client.post(
                 "/api/v1/webhooks/stripe",
                 content=json.dumps(event).encode(),

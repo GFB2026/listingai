@@ -27,6 +27,7 @@ def _canspam_footer(
     physical_address: str,
     unsubscribe_url: str | None = None,
     brokerage_name: str | None = None,
+    from_email: str | None = None,
 ) -> str:
     """Build a CAN-SPAM compliant footer with physical address and unsubscribe link.
 
@@ -34,16 +35,32 @@ def _canspam_footer(
     in every commercial email.
     """
     name_line = f"{brokerage_name} &bull; " if brokerage_name else ""
-    unsub = (
-        f'<a href="{unsubscribe_url}" style="color:#999999;text-decoration:underline;">Unsubscribe</a>'
-        if unsubscribe_url
-        else '<a href="mailto:{from_email}?subject=Unsubscribe" style="color:#999999;text-decoration:underline;">Unsubscribe</a>'
+    unsub_style = "color:#999999;text-decoration:underline;"
+    if unsubscribe_url:
+        unsub = (
+            f'<a href="{unsubscribe_url}"'
+            f' style="{unsub_style}">Unsubscribe</a>'
+        )
+    else:
+        mailto = from_email or ""
+        unsub = (
+            f'<a href="mailto:{mailto}?subject=Unsubscribe"'
+            f' style="{unsub_style}">Unsubscribe</a>'
+        )
+    footer_style = (
+        "margin-top:24px;padding:16px 0;"
+        "border-top:1px solid #eeeeee;"
+        "text-align:center;font-size:10px;"
+        "color:#777777;"
+        "font-family:Arial,Helvetica,sans-serif;"
     )
-    return f"""\
-<div style="margin-top:24px;padding:16px 0;border-top:1px solid #eeeeee;text-align:center;font-size:10px;color:#777777;font-family:Arial,Helvetica,sans-serif;">
-  <div>{name_line}{physical_address}</div>
-  <div style="margin-top:4px;">{unsub} from future emails.</div>
-</div>"""
+    return (
+        f'<div style="{footer_style}">'
+        f"<div>{name_line}{physical_address}</div>"
+        f'<div style="margin-top:4px;">'
+        f"{unsub} from future emails.</div>"
+        f"</div>"
+    )
 
 
 class EmailService:
@@ -94,6 +111,7 @@ class EmailService:
                 physical_address=physical_address,
                 unsubscribe_url=unsubscribe_url,
                 brokerage_name=self.from_name,
+                from_email=self.from_email,
             )
             # Insert before closing </body> or </div>, or just append
             if "</body>" in html_content.lower():

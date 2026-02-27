@@ -62,7 +62,7 @@ async def create_connection(
 
 @router.patch("/{connection_id}", response_model=MLSConnectionResponse)
 async def update_connection(
-    connection_id: str,
+    connection_id: UUID,
     request: MLSConnectionUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
@@ -70,7 +70,7 @@ async def update_connection(
     """Update an existing MLS connection."""
     result = await db.execute(
         select(MLSConnection).where(
-            MLSConnection.id == UUID(connection_id),
+            MLSConnection.id == connection_id,
             MLSConnection.tenant_id == user.tenant_id,
         )
     )
@@ -96,14 +96,14 @@ async def update_connection(
 
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_connection(
-    connection_id: str,
+    connection_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Delete an MLS connection."""
     result = await db.execute(
         select(MLSConnection).where(
-            MLSConnection.id == UUID(connection_id),
+            MLSConnection.id == connection_id,
             MLSConnection.tenant_id == user.tenant_id,
         )
     )
@@ -117,14 +117,14 @@ async def delete_connection(
 
 @router.post("/{connection_id}/test", response_model=MLSConnectionTestResult)
 async def test_connection(
-    connection_id: str,
+    connection_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Test an MLS connection by authenticating and fetching one property."""
     result = await db.execute(
         select(MLSConnection).where(
-            MLSConnection.id == UUID(connection_id),
+            MLSConnection.id == connection_id,
             MLSConnection.tenant_id == user.tenant_id,
         )
     )
@@ -153,14 +153,14 @@ async def test_connection(
 
 @router.get("/{connection_id}/status", response_model=MLSConnectionStatus)
 async def get_connection_status(
-    connection_id: str,
+    connection_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Get sync status for an MLS connection."""
     result = await db.execute(
         select(MLSConnection).where(
-            MLSConnection.id == UUID(connection_id),
+            MLSConnection.id == connection_id,
             MLSConnection.tenant_id == user.tenant_id,
         )
     )

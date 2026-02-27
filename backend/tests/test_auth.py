@@ -241,6 +241,48 @@ class TestRefreshEndpoint:
         assert response.status_code == 401
 
 
+class TestRefreshTokenRotation:
+    @pytest.mark.asyncio
+    async def test_refresh_blacklists_old_token(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """After refresh, the old refresh token should be blacklisted."""
+        refresh = create_refresh_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id)}
+        )
+        old_payload = decode_token(refresh)
+        old_jti = old_payload["jti"]
+
+        with patch("app.api.v1.auth.blacklist_token", new_callable=AsyncMock) as mock_bl:
+            response = await client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": refresh},
+            )
+        assert response.status_code == 200
+        # Old refresh token's JTI should be blacklisted
+        mock_bl.assert_called_once()
+        assert mock_bl.call_args[0][0] == old_jti
+
+    @pytest.mark.asyncio
+    async def test_replayed_refresh_token_rejected(
+        self, client: AsyncClient, test_user: User, test_tenant: Tenant
+    ):
+        """A refresh token that has already been rotated should be rejected."""
+        refresh = create_refresh_token(
+            data={"sub": str(test_user.id), "tenant_id": str(test_tenant.id)}
+        )
+
+        with patch(
+            "app.api.v1.auth.is_token_blacklisted", new_callable=AsyncMock, return_value=True
+        ):
+            response = await client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": refresh},
+            )
+        assert response.status_code == 401
+        assert "revoked" in response.json()["detail"].lower()
+
+
 class TestRegisterDuplicateSlug:
     @pytest.mark.asyncio
     async def test_register_duplicate_slug(self, client: AsyncClient):

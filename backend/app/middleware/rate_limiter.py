@@ -1,3 +1,4 @@
+import ipaddress
 import time
 
 import redis.exceptions as redis_exceptions
@@ -9,6 +10,19 @@ from starlette.responses import JSONResponse, Response
 from app.core.redis import get_redis
 
 logger = structlog.get_logger()
+
+
+def _get_client_ip(request: Request) -> str:
+    """Extract client IP with validated X-Forwarded-For support."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        candidate = forwarded.split(",")[0].strip()
+        try:
+            ipaddress.ip_address(candidate)
+            return candidate
+        except ValueError:
+            pass
+    return request.client.host if request.client else "unknown"
 
 # Paths to skip rate limiting
 SKIP_PATHS = {
@@ -58,7 +72,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     max_requests, window_seconds = prefix_max, prefix_window
                     break
 
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = _get_client_ip(request)
 
         try:
             redis = await get_redis()

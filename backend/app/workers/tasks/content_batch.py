@@ -40,11 +40,21 @@ def batch_generate_content(
         logger.error(
             "batch_generate_timeout",
             tenant_id=tenant_id,
+            content_type=content_type,
             listing_count=len(listing_ids),
+            retry=self.request.retries,
         )
         raise
     except Exception as exc:
-        logger.error("batch_generate_error", tenant_id=tenant_id, error=str(exc))
+        logger.error(
+            "batch_generate_error",
+            tenant_id=tenant_id,
+            content_type=content_type,
+            listing_count=len(listing_ids),
+            error_type=type(exc).__name__,
+            error=str(exc),
+            retry=self.request.retries,
+        )
         raise self.retry(exc=exc) from exc
 
 
@@ -69,12 +79,16 @@ async def _batch_generate(
 
     ai_service = AIService()
 
+    succeeded = 0
+    failed = 0
+    skipped = 0
+
     async with async_session_factory() as session:
         await set_tenant_context(session, tenant_id)
 
         content_service = ContentService(session)
 
-        for listing_id in listing_ids:
+        for idx, listing_id in enumerate(listing_ids):
             try:
                 result = await session.execute(
                     select(Listing).where(
@@ -84,7 +98,13 @@ async def _batch_generate(
                 )
                 listing = result.scalar_one_or_none()
                 if not listing:
-                    await logger.awarning("listing_not_found", listing_id=listing_id)
+                    skipped += 1
+                    await logger.awarning(
+                        "batch_listing_not_found",
+                        listing_id=listing_id,
+                        index=idx,
+                        tenant_id=tenant_id,
+                    )
                     continue
 
                 start = time.time()
@@ -114,11 +134,25 @@ async def _batch_generate(
                     generation_time_ms=generation_time_ms,
                 )
 
-                await logger.ainfo("batch_item_complete", listing_id=listing_id)
+                succeeded += 1
+                await logger.ainfo(
+                    "batch_item_complete",
+                    listing_id=listing_id,
+                    index=idx,
+                    generation_time_ms=generation_time_ms,
+                )
 
             except Exception as e:
+                failed += 1
                 await logger.aerror(
-                    "batch_item_error", listing_id=listing_id, error=str(e)
+                    "batch_item_error",
+                    listing_id=listing_id,
+                    index=idx,
+                    content_type=content_type,
+                    tenant_id=tenant_id,
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    exc_info=True,
                 )
 
         await session.commit()
@@ -126,6 +160,9 @@ async def _batch_generate(
     await logger.ainfo(
         "batch_complete",
         tenant_id=tenant_id,
-        listing_count=len(listing_ids),
         content_type=content_type,
+        total=len(listing_ids),
+        succeeded=succeeded,
+        failed=failed,
+        skipped=skipped,
     )

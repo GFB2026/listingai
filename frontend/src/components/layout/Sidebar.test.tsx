@@ -15,7 +15,7 @@ describe("Sidebar", () => {
 
   it("renders all nav links", () => {
     render(<Sidebar />);
-    const labels = ["Dashboard", "Listings", "Content", "Brand", "Settings", "MLS", "Billing"];
+    const labels = ["Dashboard", "Listings", "Content", "Brand", "Social", "Settings", "MLS", "Billing"];
     for (const label of labels) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }

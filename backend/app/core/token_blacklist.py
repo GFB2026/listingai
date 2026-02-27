@@ -1,3 +1,5 @@
+import time
+
 import redis.exceptions as redis_exceptions
 import structlog
 
@@ -6,6 +8,10 @@ from app.core.redis import get_redis
 logger = structlog.get_logger()
 
 BLACKLIST_PREFIX = "token_blacklist:"
+
+# When Redis is down, reject tokens older than this (seconds).
+# Tokens minted within this window are accepted (bounded fail-open).
+FAIL_OPEN_MAX_AGE = 300  # 5 minutes
 
 
 async def blacklist_token(jti: str, ttl_seconds: int) -> None:
@@ -24,14 +30,34 @@ async def blacklist_token(jti: str, ttl_seconds: int) -> None:
         )
 
 
-async def is_token_blacklisted(jti: str) -> bool:
-    """Check if a token's JTI has been blacklisted."""
+async def is_token_blacklisted(jti: str, iat: float | None = None) -> bool:
+    """Check if a token's JTI has been blacklisted.
+
+    Args:
+        jti: JWT ID claim.
+        iat: Issued-at timestamp (epoch seconds). Used for bounded fail-open
+             when Redis is unavailable — tokens older than FAIL_OPEN_MAX_AGE
+             are rejected.
+    """
     try:
         redis = await get_redis()
         result = await redis.get(f"{BLACKLIST_PREFIX}{jti}")
         return result is not None
     except (redis_exceptions.RedisError, ConnectionError, OSError, RuntimeError):
-        # If Redis is down, we can't verify blacklist status. Log as error
-        # and return False (fail open) — the token is still time-limited by its exp claim.
+        # Bounded fail-open: if we can't reach Redis and the token is older
+        # than FAIL_OPEN_MAX_AGE, treat it as blacklisted. This limits the
+        # replay window while avoiding a total lockout during Redis outages.
+        if iat is not None:
+            age = time.time() - iat
+            if age > FAIL_OPEN_MAX_AGE:
+                await logger.aerror(
+                    "token_blacklist_fail_open_rejected",
+                    jti=jti,
+                    age_seconds=int(age),
+                    max_age=FAIL_OPEN_MAX_AGE,
+                    exc_info=True,
+                )
+                return True
+
         await logger.aerror("token_blacklist_check_failed", jti=jti, exc_info=True)
         return False

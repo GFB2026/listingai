@@ -250,8 +250,16 @@ class TestTriggerSync:
         mock_redis.exists = AsyncMock(return_value=False)
         mock_redis.setex = AsyncMock()
 
-        with patch("app.api.v1.listings.get_redis", new_callable=AsyncMock, return_value=mock_redis), \
-             patch("app.workers.tasks.mls_sync.sync_mls_listings") as mock_task:
+        with (
+            patch(
+                "app.api.v1.listings.get_redis",
+                new_callable=AsyncMock,
+                return_value=mock_redis,
+            ),
+            patch(
+                "app.workers.tasks.mls_sync.sync_mls_listings",
+            ) as mock_task,
+        ):
             mock_task.delay = MagicMock()
             resp = await client.post("/api/v1/listings/sync", headers=headers)
 
@@ -268,7 +276,11 @@ class TestTriggerSync:
         mock_redis.exists = AsyncMock(return_value=True)
         mock_redis.ttl = AsyncMock(return_value=250)
 
-        with patch("app.api.v1.listings.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+        with patch(
+            "app.api.v1.listings.get_redis",
+            new_callable=AsyncMock,
+            return_value=mock_redis,
+        ):
             resp = await client.post("/api/v1/listings/sync", headers=headers)
 
         assert resp.status_code == 429

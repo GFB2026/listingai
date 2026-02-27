@@ -12,6 +12,9 @@ from app.services.listing_service import ListingService
 logger = structlog.get_logger()
 
 
+MAX_PAGES = 50  # Safety valve: never fetch more than 50 pages per sync run
+
+
 class SyncEngine:
     """Incremental MLS sync using ModificationTimestamp watermark."""
 
@@ -34,8 +37,9 @@ class SyncEngine:
             latest_timestamp = connection.sync_watermark
             skip = 0
             page_size = 200
+            pages_fetched = 0
 
-            while True:
+            while pages_fetched < MAX_PAGES:
                 data = await client.get_properties(
                     filter_query=filter_query,
                     top=page_size,
@@ -94,16 +98,26 @@ class SyncEngine:
                         )
 
                 skip += page_size
+                pages_fetched += 1
 
                 # Check if we got fewer records than page size (last page)
                 if len(records) < page_size:
                     break
 
-            # Only advance watermark if all records processed without errors.
-            # On partial failure, keep old watermark so failed records are re-fetched.
+            if pages_fetched >= MAX_PAGES:
+                await logger.awarning(
+                    "sync_max_pages_reached",
+                    connection_id=str(connection.id),
+                    max_pages=MAX_PAGES,
+                    total_records=stats["total"],
+                )
+
+            # Only advance watermark AND timestamp if all records processed
+            # without errors. On partial failure, keep old values so failed
+            # records are re-fetched on the next run.
             if latest_timestamp and stats["errors"] == 0:
                 connection.sync_watermark = latest_timestamp
-            connection.last_sync_at = datetime.now(UTC)
+                connection.last_sync_at = datetime.now(UTC)
             self.db.add(connection)
             await self.db.flush()
 

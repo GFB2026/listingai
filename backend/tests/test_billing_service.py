@@ -57,9 +57,18 @@ class TestCreateOrUpdateSubscription:
         mock_subscription.id = "sub_test123"
 
         with (
-            patch("app.services.billing_service.stripe.Customer.create", return_value=mock_customer),
-            patch("app.services.billing_service.stripe.Subscription.create", return_value=mock_subscription),
-            patch("app.services.billing_service.get_settings") as mock_settings,
+            patch(
+                "app.services.billing_service.stripe.Customer.create",
+                return_value=mock_customer,
+            ),
+            patch(
+                "app.services.billing_service"
+                ".stripe.Subscription.create",
+                return_value=mock_subscription,
+            ),
+            patch(
+                "app.services.billing_service.get_settings",
+            ) as mock_settings,
         ):
             mock_settings.return_value.stripe_secret_key = "sk_test"
             mock_settings.return_value.stripe_price_id_starter = "price_starter"
@@ -86,9 +95,17 @@ class TestCreateOrUpdateSubscription:
         mock_subscription.id = "sub_new"
 
         with (
-            patch("app.services.billing_service.stripe.Customer.create") as mock_create,
-            patch("app.services.billing_service.stripe.Subscription.create", return_value=mock_subscription),
-            patch("app.services.billing_service.get_settings") as mock_settings,
+            patch(
+                "app.services.billing_service.stripe.Customer.create",
+            ) as mock_create,
+            patch(
+                "app.services.billing_service"
+                ".stripe.Subscription.create",
+                return_value=mock_subscription,
+            ),
+            patch(
+                "app.services.billing_service.get_settings",
+            ) as mock_settings,
         ):
             mock_settings.return_value.stripe_secret_key = "sk_test"
             mock_settings.return_value.stripe_price_id_starter = "price_starter"
@@ -150,7 +167,9 @@ class TestCreateOrUpdateSubscription:
                 )
 
     @pytest.mark.asyncio
-    async def test_stripe_error_on_subscription(self, db_session: AsyncSession, test_tenant: Tenant):
+    async def test_stripe_error_on_subscription(
+        self, db_session: AsyncSession, test_tenant: Tenant,
+    ):
         """General StripeError on subscription create (not customer create)."""
         import stripe
 
@@ -185,8 +204,14 @@ class TestCreateOrUpdateSubscription:
         mock_subscription.id = "sub_ent"
 
         with (
-            patch("app.services.billing_service.stripe.Subscription.create", return_value=mock_subscription),
-            patch("app.services.billing_service.get_settings") as mock_settings,
+            patch(
+                "app.services.billing_service"
+                ".stripe.Subscription.create",
+                return_value=mock_subscription,
+            ),
+            patch(
+                "app.services.billing_service.get_settings",
+            ) as mock_settings,
         ):
             mock_settings.return_value.stripe_secret_key = "sk_test"
             mock_settings.return_value.stripe_price_id_starter = "price_starter"

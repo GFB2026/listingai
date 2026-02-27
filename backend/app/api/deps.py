@@ -42,9 +42,9 @@ async def get_current_user(
             detail="Invalid or expired token",
         )
 
-    # Check token blacklist
+    # Check token blacklist (with bounded fail-open via iat)
     jti = payload.get("jti")
-    if jti and await is_token_blacklisted(jti):
+    if jti and await is_token_blacklisted(jti, iat=payload.get("iat")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",

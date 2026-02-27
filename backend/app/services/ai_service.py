@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.brand_profile import BrandProfile
 from app.models.listing import Listing
+from app.models.tenant import Tenant
 from app.services.prompt_builder import PromptBuilder
 
 logger = structlog.get_logger()
@@ -23,23 +24,19 @@ CIRCUIT_BREAKER_STATE = Gauge(
 )
 _STATE_MAP = {"closed": 0, "open": 1, "half_open": 2}
 
-# Model selection based on content type
-MODEL_MAP = {
-    "listing_description": "claude-sonnet-4-5-20250929",
-    "social_instagram": "claude-sonnet-4-5-20250929",
-    "social_facebook": "claude-sonnet-4-5-20250929",
-    "social_linkedin": "claude-sonnet-4-5-20250929",
-    "social_x": "claude-haiku-4-5-20251001",
-    "email_just_listed": "claude-sonnet-4-5-20250929",
-    "email_open_house": "claude-sonnet-4-5-20250929",
-    "email_drip": "claude-sonnet-4-5-20250929",
-    "flyer": "claude-sonnet-4-5-20250929",
-    "video_script": "claude-sonnet-4-5-20250929",
-    # Event types
-    "open_house_invite": "claude-sonnet-4-5-20250929",
-    "price_reduction": "claude-sonnet-4-5-20250929",
-    "just_sold": "claude-sonnet-4-5-20250929",
-}
+# Content types that use the short (cheaper/faster) model
+_SHORT_MODEL_TYPES = {"social_x"}
+
+
+def _build_model_map(default: str, short: str) -> dict[str, str]:
+    """Build content-type → model mapping from configured model IDs."""
+    types = [
+        "listing_description", "social_instagram", "social_facebook",
+        "social_linkedin", "social_x", "email_just_listed", "email_open_house",
+        "email_drip", "flyer", "video_script",
+        "open_house_invite", "price_reduction", "just_sold",
+    ]
+    return {t: short if t in _SHORT_MODEL_TYPES else default for t in types}
 
 # --- Circuit Breaker ---
 # Simple in-process circuit breaker. Opens after FAILURE_THRESHOLD consecutive
@@ -126,6 +123,10 @@ class AIService:
             max_retries=2,
         )
         self.prompt_builder = PromptBuilder()
+        self._model_map = _build_model_map(
+            settings.claude_model_default, settings.claude_model_short,
+        )
+        self._default_model = settings.claude_model_default
 
     async def generate(
         self,
@@ -158,6 +159,16 @@ class AIService:
             )
             brand_profile = result.scalar_one_or_none()
 
+        # Load tenant market data (if configured)
+        market_areas = None
+        tenant_result = await db.execute(
+            select(Tenant).where(Tenant.id == UUID(tenant_id))
+        )
+        tenant = tenant_result.scalar_one_or_none()
+        if tenant and tenant.settings:
+            market_data = tenant.settings.get("market_data", {})
+            market_areas = market_data.get("areas") if isinstance(market_data, dict) else None
+
         # Build prompt using three-layer architecture
         system_prompt, user_prompt = self.prompt_builder.build(
             listing=listing,
@@ -166,10 +177,11 @@ class AIService:
             brand_profile=brand_profile,
             instructions=instructions,
             event_details=event_details,
+            market_areas=market_areas,
         )
 
         # Select model
-        model = MODEL_MAP.get(content_type, "claude-sonnet-4-5-20250929")
+        model = self._model_map.get(content_type, self._default_model)
 
         # Circuit breaker check
         if not _circuit.allow_request():

@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     # Anthropic
     anthropic_api_key: str = ""
+    claude_model_default: str = "claude-sonnet-4-5-20250929"
+    claude_model_short: str = "claude-haiku-4-5-20251001"
 
     # JWT
     jwt_secret_key: str = ""
@@ -118,7 +120,10 @@ class Settings(BaseSettings):
     @classmethod
     def check_redis_url(cls, v: str) -> str:
         if v and not v.startswith("redis"):
-            raise ValueError(f"Redis URL must start with 'redis://' or 'rediss://', got '{v[:30]}...'")
+            raise ValueError(
+                f"Redis URL must start with 'redis://' or"
+                f" 'rediss://', got '{v[:30]}...'"
+            )
         return v
 
     @field_validator("sendgrid_default_from_email")
@@ -181,6 +186,10 @@ def get_settings() -> Settings:
             errors.append("STRIPE_SECRET_KEY must be set")
         if not settings.stripe_publishable_key:
             errors.append("STRIPE_PUBLISHABLE_KEY must be set")
+        if not settings.sendgrid_api_key:
+            errors.append("SENDGRID_API_KEY must be set")
+        if not settings.sendgrid_default_from_email:
+            errors.append("SENDGRID_DEFAULT_FROM_EMAIL must be set")
         if errors:
             raise ValueError(
                 "Production configuration errors:\n" + "\n".join(f"  - {e}" for e in errors)

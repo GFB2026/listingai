@@ -1,6 +1,5 @@
 """Tests for FlyerService (PPTX + PDF flyer generation)."""
 
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -49,7 +48,12 @@ class TestBrandingConfig:
 
 class TestHelpers:
     def test_extract_body_copy_strips_markdown(self):
-        text = "# Headline\n---\nShort line.\nThis is a longer body paragraph that exceeds sixty characters in total length for selection."
+        text = (
+            "# Headline\n---\nShort line.\n"
+            "This is a longer body paragraph that exceeds"
+            " sixty characters in total length"
+            " for selection."
+        )
         body = _extract_body_copy(text)
         assert "Headline" not in body
         assert "---" not in body

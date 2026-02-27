@@ -1,12 +1,11 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_tenant_db
-from app.models.content import Content
 from app.models.email_campaign import EmailCampaign
 from app.models.tenant import Tenant
 from app.models.user import User
@@ -19,13 +18,13 @@ router = APIRouter()
 
 
 class EmailSendRequest(BaseModel):
-    to_emails: list[str] = Field(..., min_length=1, max_length=1000)
+    to_emails: list[EmailStr] = Field(..., min_length=1, max_length=1000)
     subject: str = Field(..., min_length=1, max_length=500)
     html_content: str = Field(..., min_length=1, max_length=200000)
     campaign_type: str = Field(default="manual", max_length=50)
-    reply_to: str | None = None
-    content_id: str | None = None
-    listing_id: str | None = None
+    reply_to: EmailStr | None = None
+    content_id: UUID | None = None
+    listing_id: UUID | None = None
 
 
 class EmailSendResponse(BaseModel):
@@ -80,9 +79,10 @@ async def send_email(
     tenant = tenant_result.scalar_one_or_none()
     physical_address = None
     unsubscribe_url = None
-    if tenant and tenant.settings:
-        physical_address = tenant.settings.get("physical_address")
-        unsubscribe_url = tenant.settings.get("unsubscribe_url")
+    if tenant:
+        settings = tenant.settings or {}
+        physical_address = settings.get("physical_address")
+        unsubscribe_url = settings.get("unsubscribe_url")
 
     campaign = await service.send_and_track(
         db=db,
@@ -92,8 +92,8 @@ async def send_email(
         html_content=request.html_content,
         campaign_type=request.campaign_type,
         reply_to=request.reply_to,
-        content_id=UUID(request.content_id) if request.content_id else None,
-        listing_id=UUID(request.listing_id) if request.listing_id else None,
+        content_id=request.content_id,
+        listing_id=request.listing_id,
         user_id=user.id,
         physical_address=physical_address,
         unsubscribe_url=unsubscribe_url,

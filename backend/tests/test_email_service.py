@@ -133,7 +133,11 @@ class TestEmailServiceSend:
             mock.return_value.sendgrid_default_from_name = "Test"
             service = EmailService()
 
-        with patch("httpx.AsyncClient.post", new_callable=AsyncMock, side_effect=httpx.TimeoutException("timeout")):
+        with patch(
+            "httpx.AsyncClient.post",
+            new_callable=AsyncMock,
+            side_effect=httpx.TimeoutException("timeout"),
+        ):
             result = await service.send(["user@test.com"], "Subject", "<p>Body</p>")
 
         assert result["failed"] == 1

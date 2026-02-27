@@ -9,6 +9,7 @@ interface GenerateRequest {
   tone: string;
   brand_profile_id?: string | null;
   instructions?: string;
+  event_details?: string;
   variants: number;
 }
 

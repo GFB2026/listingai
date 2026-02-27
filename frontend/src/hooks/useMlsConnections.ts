@@ -107,6 +107,41 @@ export function useTestMlsConnection() {
   });
 }
 
+interface MLSConnectionUpdate {
+  id: string;
+  name?: string;
+  base_url?: string;
+  client_id?: string;
+  client_secret?: string;
+  sync_enabled?: boolean;
+}
+
+export function useUpdateMlsConnection() {
+  const queryClient = useQueryClient();
+
+  return useMutation<MLSConnection, Error, MLSConnectionUpdate>({
+    mutationFn: async ({ id, ...data }) => {
+      const res = await api.patch(`/mls-connections/${id}`, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mls-connections"] });
+      useToastStore.getState().toast({
+        title: "Connection updated",
+        description: "MLS connection has been updated successfully.",
+        variant: "success",
+      });
+    },
+    onError: (error: Error) => {
+      useToastStore.getState().toast({
+        title: "Update failed",
+        description: getErrorMessage(error),
+        variant: "error",
+      });
+    },
+  });
+}
+
 export function useDeleteMlsConnection() {
   const queryClient = useQueryClient();
 

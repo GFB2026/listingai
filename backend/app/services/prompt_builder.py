@@ -1,5 +1,6 @@
 from app.models.brand_profile import BrandProfile
 from app.models.listing import Listing
+from app.services.market_data import build_market_section
 from app.prompts.email_campaign import (
     EMAIL_DRIP_SYSTEM,
     EMAIL_JUST_LISTED_SYSTEM,
@@ -49,6 +50,7 @@ class PromptBuilder:
         brand_profile: BrandProfile | None = None,
         instructions: str | None = None,
         event_details: str = "",
+        market_areas: list[dict] | None = None,
     ) -> tuple[str, str]:
         # Layer 1: System prompt (per content type)
         system = SYSTEM_PROMPTS.get(content_type, LISTING_DESCRIPTION_SYSTEM)
@@ -62,6 +64,18 @@ class PromptBuilder:
 
         # Layer 3: Listing data + user instructions
         user_prompt = self._build_listing_section(listing)
+
+        # Layer 4: Market data enrichment
+        if market_areas:
+            listing_dict = {
+                "address_city": getattr(listing, "address_city", None),
+                "address_zip": getattr(listing, "address_zip", None),
+                "county": getattr(listing, "county", None),
+            }
+            market_section = build_market_section(listing_dict, market_areas)
+            if market_section:
+                user_prompt += f"\n\n{market_section}"
+
         if instructions:
             user_prompt += f"\n\nADDITIONAL INSTRUCTIONS:\n{instructions}"
 

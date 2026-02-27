@@ -225,7 +225,7 @@ class TestGetLead:
         page = await _agent_page(db_session, test_tenant, test_user)
         lead = await _lead(db_session, test_tenant, test_user, page)
         # Login as agent
-        agent = await _agent_user(db_session, test_tenant)
+        await _agent_user(db_session, test_tenant)
         headers = await auth_headers(client, "agent@example.com", "Agentpass123!")
         resp = await client.get(f"/api/v1/leads/{lead.id}", headers=headers)
         assert resp.status_code == 404
@@ -329,7 +329,7 @@ class TestUpdateLead:
     ):
         page = await _agent_page(db_session, test_tenant, test_user)
         lead = await _lead(db_session, test_tenant, test_user, page)
-        agent = await _agent_user(db_session, test_tenant)
+        await _agent_user(db_session, test_tenant)
         headers = await auth_headers(client, "agent@example.com", "Agentpass123!")
         resp = await client.patch(
             f"/api/v1/leads/{lead.id}",
@@ -407,7 +407,7 @@ class TestLeadActivities:
     ):
         page = await _agent_page(db_session, test_tenant, test_user)
         lead = await _lead(db_session, test_tenant, test_user, page)
-        agent = await _agent_user(db_session, test_tenant)
+        await _agent_user(db_session, test_tenant)
         headers = await auth_headers(client, "agent@example.com", "Agentpass123!")
         resp = await client.post(
             f"/api/v1/leads/{lead.id}/activities",
@@ -483,7 +483,7 @@ class TestLeadAnalytics:
     async def test_analytics_agent_forbidden(
         self, client: AsyncClient, test_tenant: Tenant, db_session: AsyncSession,
     ):
-        agent = await _agent_user(db_session, test_tenant)
+        await _agent_user(db_session, test_tenant)
         headers = await auth_headers(client, "agent@example.com", "Agentpass123!")
         resp = await client.get("/api/v1/leads/analytics/summary", headers=headers)
         assert resp.status_code == 403

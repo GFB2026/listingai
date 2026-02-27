@@ -80,7 +80,7 @@ class TestListAgentPages:
     async def test_list_agent_role_forbidden(
         self, client: AsyncClient, test_tenant: Tenant, db_session: AsyncSession,
     ):
-        agent = await _create_agent_user(db_session, test_tenant)
+        await _create_agent_user(db_session, test_tenant)
         headers = await auth_headers(client, "agent@example.com", "Agentpass123!")
         resp = await client.get("/api/v1/agent-pages", headers=headers)
         assert resp.status_code == 403
@@ -218,7 +218,7 @@ class TestUpdateAgentPage:
     async def test_update_slug_duplicate(
         self, client: AsyncClient, test_user: User, test_tenant: Tenant, db_session: AsyncSession,
     ):
-        page = await _create_agent_page(db_session, test_tenant, test_user, slug="page-one")
+        await _create_agent_page(db_session, test_tenant, test_user, slug="page-one")
         # Create second user + page
         user2 = User(
             tenant_id=test_tenant.id,
@@ -293,7 +293,7 @@ class TestUpdateAgentPage:
         # Create page owned by test_user (admin)
         page = await _create_agent_page(db_session, test_tenant, test_user, slug="admin-page")
         # Login as agent
-        agent = await _create_agent_user(db_session, test_tenant)
+        await _create_agent_user(db_session, test_tenant)
         headers = await auth_headers(client, "agent@example.com", "Agentpass123!")
         resp = await client.patch(
             f"/api/v1/agent-pages/{page.id}",

@@ -1,6 +1,7 @@
 import time
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,8 @@ from app.schemas.content import (
 from app.services.ai_service import AIService
 from app.services.content_service import ContentService
 
+logger = structlog.get_logger()
+
 router = APIRouter()
 
 
@@ -37,7 +40,7 @@ async def generate_content(
     # Fetch listing
     result = await db.execute(
         select(Listing).where(
-            Listing.id == UUID(request.listing_id),
+            Listing.id == request.listing_id,
             Listing.tenant_id == user.tenant_id,
         )
     )
@@ -49,7 +52,7 @@ async def generate_content(
     if request.brand_profile_id:
         bp_result = await db.execute(
             select(BrandProfile).where(
-                BrandProfile.id == UUID(request.brand_profile_id),
+                BrandProfile.id == request.brand_profile_id,
                 BrandProfile.tenant_id == user.tenant_id,
             )
         )
@@ -70,8 +73,8 @@ async def generate_content(
 
     generated_items = []
     for _i in range(request.variants):
-        # Re-check credits before each variant to prevent over-consumption
-        remaining = await content_service.get_remaining_credits(user.tenant_id)
+        # Re-check credits with row lock to serialize concurrent requests
+        remaining = await content_service.get_remaining_credits(user.tenant_id, lock=True)
         if remaining < 1:
             if not generated_items:
                 raise HTTPException(
@@ -86,13 +89,23 @@ async def generate_content(
                 listing=listing,
                 content_type=request.content_type,
                 tone=request.tone,
-                brand_profile_id=request.brand_profile_id,
+                brand_profile_id=(
+                    str(request.brand_profile_id)
+                    if request.brand_profile_id
+                    else None
+                ),
                 instructions=request.instructions,
                 event_details=request.event_details or "",
                 tenant_id=str(user.tenant_id),
                 db=db,
             )
         except Exception:
+            logger.warning(
+                "variant_generation_failed",
+                content_type=request.content_type,
+                variant=len(generated_items) + 1,
+                exc_info=True,
+            )
             if not generated_items:
                 raise
             break
@@ -105,7 +118,7 @@ async def generate_content(
             user_id=user.id,
             content_type=request.content_type,
             tone=request.tone,
-            brand_profile_id=UUID(request.brand_profile_id) if request.brand_profile_id else None,
+            brand_profile_id=request.brand_profile_id,
             body=result["body"],
             metadata=result.get("metadata", {}),
             ai_model=result["model"],
@@ -136,7 +149,7 @@ async def generate_content(
 @router.get("", response_model=ContentListResponse)
 async def list_content(
     content_type: str | None = None,
-    listing_id: str | None = None,
+    listing_id: UUID | None = None,
     status_filter: str | None = Query(None, alias="status"),
     page: int = Query(1, ge=1, le=1000),
     page_size: int = Query(20, ge=1, le=100),
@@ -148,7 +161,7 @@ async def list_content(
     if content_type:
         query = query.where(Content.content_type == content_type)
     if listing_id:
-        query = query.where(Content.listing_id == UUID(listing_id))
+        query = query.where(Content.listing_id == listing_id)
     if status_filter:
         query = query.where(Content.status == status_filter)
 
@@ -172,13 +185,13 @@ async def list_content(
 
 @router.get("/{content_id}", response_model=ContentResponse)
 async def get_content(
-    content_id: str,
+    content_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(
         select(Content).where(
-            Content.id == UUID(content_id),
+            Content.id == content_id,
             Content.tenant_id == user.tenant_id,
         )
     )
@@ -190,14 +203,14 @@ async def get_content(
 
 @router.patch("/{content_id}", response_model=ContentResponse)
 async def update_content(
-    content_id: str,
+    content_id: UUID,
     update: ContentUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(
         select(Content).where(
-            Content.id == UUID(content_id),
+            Content.id == content_id,
             Content.tenant_id == user.tenant_id,
         )
     )
@@ -229,13 +242,13 @@ async def update_content(
 
 @router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_content(
-    content_id: str,
+    content_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(
         select(Content).where(
-            Content.id == UUID(content_id),
+            Content.id == content_id,
             Content.tenant_id == user.tenant_id,
         )
     )
@@ -247,13 +260,13 @@ async def delete_content(
 
 @router.post("/{content_id}/regenerate", response_model=ContentResponse)
 async def regenerate_content(
-    content_id: str,
+    content_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(
         select(Content).where(
-            Content.id == UUID(content_id),
+            Content.id == content_id,
             Content.tenant_id == user.tenant_id,
         )
     )
@@ -263,10 +276,10 @@ async def regenerate_content(
 
     # Re-generate using same parameters
     request = ContentGenerateRequest(
-        listing_id=str(original.listing_id),
+        listing_id=original.listing_id,
         content_type=original.content_type,
         tone=original.tone or "professional",
-        brand_profile_id=str(original.brand_profile_id) if original.brand_profile_id else None,
+        brand_profile_id=original.brand_profile_id,
         variants=1,
     )
     response = await generate_content(request, user, db)
@@ -275,7 +288,7 @@ async def regenerate_content(
 
 @router.get("/{content_id}/export/{format}")
 async def export_content(
-    content_id: str,
+    content_id: UUID,
     format: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
@@ -285,7 +298,7 @@ async def export_content(
 
     result = await db.execute(
         select(Content).where(
-            Content.id == UUID(content_id),
+            Content.id == content_id,
             Content.tenant_id == user.tenant_id,
         )
     )

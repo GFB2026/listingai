@@ -13,6 +13,8 @@ const FORMATS = [
   { value: "html", label: "HTML (.html)" },
   { value: "docx", label: "Word (.docx)" },
   { value: "pdf", label: "PDF (.pdf)" },
+  { value: "pptx", label: "PowerPoint (.pptx)" },
+  { value: "flyer_pdf", label: "Flyer PDF" },
 ];
 
 export function ExportMenu({ contentId }: Props) {

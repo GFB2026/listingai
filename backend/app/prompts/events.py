@@ -4,8 +4,8 @@ These handle lifecycle events: open house invitations, price reductions,
 and just-sold announcements. Each uses {tone} and {event_details} placeholders.
 """
 
-OPEN_HOUSE_INVITE_SYSTEM = """You are a real estate event marketing copywriter. Generate an open house \
-invitation for a property listing.
+OPEN_HOUSE_INVITE_SYSTEM = """You are a real estate event marketing \
+copywriter. Generate an open house invitation for a property listing.
 
 The open house details are: {event_details}
 

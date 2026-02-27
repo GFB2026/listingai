@@ -75,11 +75,19 @@ class ContentService:
         )
         self.db.add(event)
 
-    async def get_remaining_credits(self, tenant_id: UUID) -> int:
-        # Get tenant's limit
-        result = await self.db.execute(
-            select(Tenant.monthly_generation_limit).where(Tenant.id == tenant_id)
-        )
+    async def get_remaining_credits(self, tenant_id: UUID, *, lock: bool = False) -> int:
+        """Return remaining credits for the current billing month.
+
+        Args:
+            tenant_id: Tenant to check.
+            lock: If True, acquire a row-level lock on the tenant row to
+                  serialize concurrent credit checks (use inside a transaction).
+        """
+        # Get tenant's limit (optionally with FOR UPDATE to serialize)
+        tenant_query = select(Tenant.monthly_generation_limit).where(Tenant.id == tenant_id)
+        if lock:
+            tenant_query = tenant_query.with_for_update()
+        result = await self.db.execute(tenant_query)
         limit = result.scalar()
         if limit is None:
             limit = 50

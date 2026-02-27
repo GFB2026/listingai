@@ -1,9 +1,20 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import api from "@/lib/api";
+import { useToastStore } from "@/hooks/useToast";
+
+function getErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.detail || error.message;
+  }
+  return error instanceof Error ? error.message : "An unexpected error occurred";
+}
 
 export default function BillingPage() {
+  const queryClient = useQueryClient();
+
   const { data: usage, isLoading } = useQuery({
     queryKey: ["billing", "usage"],
     queryFn: async () => {
@@ -12,29 +23,63 @@ export default function BillingPage() {
     },
   });
 
+  const subscribe = useMutation({
+    mutationFn: async (priceId: string) => {
+      const res = await api.post("/billing/subscribe", null, { params: { price_id: priceId } });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      // If the response has a URL (Stripe checkout), redirect to it
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        // Otherwise refresh usage data
+        queryClient.invalidateQueries({ queryKey: ["billing", "usage"] });
+        useToastStore.getState().toast({
+          title: "Subscription updated",
+          description: `Your plan has been updated to ${data.status}.`,
+          variant: "success",
+        });
+      }
+    },
+    onError: (error) => {
+      useToastStore.getState().toast({
+        title: "Subscription failed",
+        description: getErrorMessage(error),
+        variant: "error",
+      });
+    },
+  });
+
+  const isPaidPlan = usage?.plan && usage.plan !== "free";
+
   const plans = [
     {
       name: "Free",
       price: "$0",
       limit: "50 generations/mo",
+      priceId: null as string | null,
       current: usage?.plan === "free",
     },
     {
       name: "Starter",
       price: "$49/mo",
       limit: "200 generations/mo",
+      priceId: "price_starter",
       current: usage?.plan === "starter",
     },
     {
       name: "Professional",
       price: "$149/mo",
       limit: "1,000 generations/mo",
+      priceId: "price_professional",
       current: usage?.plan === "professional",
     },
     {
       name: "Enterprise",
       price: "Custom",
       limit: "10,000+ generations/mo",
+      priceId: "price_enterprise",
       current: usage?.plan === "enterprise",
     },
   ];
@@ -117,14 +162,25 @@ export default function BillingPage() {
             </p>
             <p className="mt-2 text-sm text-gray-600">{plan.limit}</p>
             {plan.current ? (
-              <p className="mt-4 text-sm font-medium text-primary">
-                Current Plan
-              </p>
-            ) : (
-              <button className="mt-4 w-full rounded-lg border border-primary px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary hover:text-white">
-                Upgrade
+              <>
+                <p className="mt-4 text-sm font-medium text-primary">
+                  Current Plan
+                </p>
+                {isPaidPlan && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Contact support to change or cancel your plan.
+                  </p>
+                )}
+              </>
+            ) : plan.priceId ? (
+              <button
+                onClick={() => subscribe.mutate(plan.priceId!)}
+                disabled={subscribe.isPending}
+                className="mt-4 w-full rounded-lg border border-primary px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary hover:text-white disabled:opacity-50"
+              >
+                {subscribe.isPending ? "Processing..." : "Upgrade"}
               </button>
-            )}
+            ) : null}
           </div>
         ))}
       </div>

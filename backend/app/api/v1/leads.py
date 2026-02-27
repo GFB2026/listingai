@@ -36,7 +36,7 @@ def _lead_to_response(lead: Lead, agent_name: str | None = None) -> LeadResponse
 async def list_leads(
     pipeline_status: str | None = None,
     utm_source: str | None = None,
-    agent_id: str | None = None,
+    agent_id: UUID | None = None,
     page: int = Query(1, ge=1, le=10000),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(get_current_user),
@@ -46,7 +46,7 @@ async def list_leads(
     service = LeadService(db)
     leads, total = await service.list_leads(
         tenant_id=user.tenant_id,
-        agent_id=UUID(agent_id) if agent_id else None,
+        agent_id=agent_id,
         pipeline_status=pipeline_status,
         utm_source=utm_source,
         page=page,
@@ -56,7 +56,7 @@ async def list_leads(
     )
 
     # Batch-fetch agent names
-    agent_ids = {l.agent_id for l in leads if l.agent_id}
+    agent_ids = {lead.agent_id for lead in leads if lead.agent_id}
     agent_names = {}
     if agent_ids:
         result = await db.execute(
@@ -102,14 +102,14 @@ async def analytics_funnel(
 
 @router.get("/{lead_id}", response_model=LeadDetailResponse)
 async def get_lead(
-    lead_id: str,
+    lead_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Get lead detail with activity timeline."""
     result = await db.execute(
         select(Lead).where(
-            Lead.id == UUID(lead_id),
+            Lead.id == lead_id,
             Lead.tenant_id == user.tenant_id,
         )
     )
@@ -160,7 +160,7 @@ async def get_lead(
 
 @router.patch("/{lead_id}", response_model=LeadResponse)
 async def update_lead(
-    lead_id: str,
+    lead_id: UUID,
     update: LeadUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
@@ -168,7 +168,7 @@ async def update_lead(
     """Update lead status, closed_value, or contact info."""
     result = await db.execute(
         select(Lead).where(
-            Lead.id == UUID(lead_id),
+            Lead.id == lead_id,
             Lead.tenant_id == user.tenant_id,
         )
     )
@@ -193,21 +193,21 @@ async def update_lead(
             property_interest=update.property_interest,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     return _lead_to_response(lead)
 
 
 @router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lead(
-    lead_id: str,
+    lead_id: UUID,
     user: User = Depends(require_role("admin", "broker")),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Delete a lead (broker/admin only)."""
     result = await db.execute(
         select(Lead).where(
-            Lead.id == UUID(lead_id),
+            Lead.id == lead_id,
             Lead.tenant_id == user.tenant_id,
         )
     )
@@ -220,7 +220,7 @@ async def delete_lead(
 
 @router.post("/{lead_id}/activities", response_model=LeadActivityResponse, status_code=201)
 async def add_activity(
-    lead_id: str,
+    lead_id: UUID,
     payload: LeadActivityCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
@@ -228,7 +228,7 @@ async def add_activity(
     """Add a note or activity to a lead."""
     result = await db.execute(
         select(Lead).where(
-            Lead.id == UUID(lead_id),
+            Lead.id == lead_id,
             Lead.tenant_id == user.tenant_id,
         )
     )

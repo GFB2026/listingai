@@ -37,6 +37,9 @@ export const CONTENT_TYPES = [
   { value: "email_drip", label: "Drip Campaign Email" },
   { value: "flyer", label: "Flyer Copy" },
   { value: "video_script", label: "Video Script" },
+  { value: "open_house_invite", label: "Open House Invite" },
+  { value: "price_reduction", label: "Price Reduction" },
+  { value: "just_sold", label: "Just Sold" },
 ] as const;
 
 export const TONES = [

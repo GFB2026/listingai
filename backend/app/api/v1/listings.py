@@ -32,7 +32,7 @@ async def list_listings(
     city: str | None = None,
     bedrooms: int | None = None,
     bathrooms: int | None = None,
-    agent_id: str | None = None,
+    agent_id: UUID | None = None,
     page: int = Query(1, ge=1, le=1000),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(get_current_user),
@@ -58,7 +58,7 @@ async def list_listings(
     if bathrooms is not None:
         query = query.where(Listing.bathrooms >= bathrooms)
     if agent_id:
-        query = query.where(Listing.listing_agent_id == UUID(agent_id))
+        query = query.where(Listing.listing_agent_id == agent_id)
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
@@ -82,13 +82,13 @@ async def list_listings(
 
 @router.get("/{listing_id}", response_model=ListingResponse)
 async def get_listing(
-    listing_id: str,
+    listing_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(
         select(Listing).where(
-            Listing.id == UUID(listing_id),
+            Listing.id == listing_id,
             Listing.tenant_id == user.tenant_id,
         )
     )

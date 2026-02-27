@@ -1,5 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+import api, { TIMEOUTS } from "@/lib/api";
+import { useToastStore } from "@/hooks/useToast";
 
 export interface ContentItem {
   id: string;
@@ -58,5 +60,97 @@ export function useContentItem(id: string) {
       return res.data;
     },
     enabled: !!id,
+  });
+}
+
+function getErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.detail || error.message;
+  }
+  return error instanceof Error ? error.message : "An unexpected error occurred";
+}
+
+interface ContentUpdateData {
+  id: string;
+  body?: string;
+  status?: string;
+  metadata?: Record<string, string | number | string[]>;
+}
+
+export function useUpdateContent() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ContentItem, Error, ContentUpdateData>({
+    mutationFn: async ({ id, ...data }) => {
+      const res = await api.patch(`/content/${id}`, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["content"] });
+      useToastStore.getState().toast({
+        title: "Content updated",
+        description: "Content has been updated successfully.",
+        variant: "success",
+      });
+    },
+    onError: (error: Error) => {
+      useToastStore.getState().toast({
+        title: "Update failed",
+        description: getErrorMessage(error),
+        variant: "error",
+      });
+    },
+  });
+}
+
+export function useDeleteContent() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: async (id) => {
+      await api.delete(`/content/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["content"] });
+      useToastStore.getState().toast({
+        title: "Content deleted",
+        description: "Content has been deleted successfully.",
+        variant: "success",
+      });
+    },
+    onError: (error: Error) => {
+      useToastStore.getState().toast({
+        title: "Delete failed",
+        description: getErrorMessage(error),
+        variant: "error",
+      });
+    },
+  });
+}
+
+export function useRegenerateContent() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ContentItem, Error, string>({
+    mutationFn: async (id) => {
+      const res = await api.post(`/content/${id}/regenerate`, {}, { timeout: TIMEOUTS.generate });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["content"] });
+      queryClient.invalidateQueries({ queryKey: ["billing", "usage"] });
+      useToastStore.getState().toast({
+        title: "Content regenerated",
+        description: "Content has been regenerated successfully.",
+        variant: "success",
+      });
+    },
+    onError: (error: Error) => {
+      useToastStore.getState().toast({
+        title: "Regeneration failed",
+        description: getErrorMessage(error),
+        variant: "error",
+      });
+    },
   });
 }

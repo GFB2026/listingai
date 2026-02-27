@@ -1,5 +1,4 @@
 """Tests for content API endpoints — generate, regenerate, batch, list, update, delete."""
-from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 

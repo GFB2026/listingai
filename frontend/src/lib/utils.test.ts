@@ -76,8 +76,8 @@ describe("truncate", () => {
 });
 
 describe("CONTENT_TYPES", () => {
-  it("has 10 entries", () => {
-    expect(CONTENT_TYPES).toHaveLength(10);
+  it("has 13 entries", () => {
+    expect(CONTENT_TYPES).toHaveLength(13);
   });
 
   it("includes listing_description", () => {

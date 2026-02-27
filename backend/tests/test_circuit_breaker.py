@@ -1,8 +1,6 @@
 """Tests for the AI service circuit breaker."""
 import time
-from unittest.mock import patch
 
-import pytest
 
 from app.services.ai_service import (
     CircuitBreakerOpenError,

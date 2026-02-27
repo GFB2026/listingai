@@ -51,8 +51,44 @@ class TestTokenBlacklist:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_blacklist_redis_down_fails_open(self):
-        """When Redis is unavailable, is_token_blacklisted should return False (fail open)."""
+    async def test_blacklist_redis_down_fails_open_young_token(self):
+        """Young token (< 5 min) accepted when Redis is down."""
+        import time
+
+        import redis.exceptions
+
+        from app.core.token_blacklist import is_token_blacklisted
+
+        young_iat = time.time() - 60  # 1 minute old
+
+        with patch(
+            "app.core.token_blacklist.get_redis",
+            side_effect=redis.exceptions.ConnectionError("Redis down"),
+        ):
+            result = await is_token_blacklisted("some-jti", iat=young_iat)
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_blacklist_redis_down_rejects_old_token(self):
+        """Old token (> 5 min) rejected when Redis is down."""
+        import time
+
+        import redis.exceptions
+
+        from app.core.token_blacklist import FAIL_OPEN_MAX_AGE, is_token_blacklisted
+
+        old_iat = time.time() - FAIL_OPEN_MAX_AGE - 60  # 6 minutes old
+
+        with patch(
+            "app.core.token_blacklist.get_redis",
+            side_effect=redis.exceptions.ConnectionError("Redis down"),
+        ):
+            result = await is_token_blacklisted("old-jti", iat=old_iat)
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_blacklist_redis_down_no_iat_fails_open(self):
+        """Without iat claim, fail open when Redis is down."""
         import redis.exceptions
 
         from app.core.token_blacklist import is_token_blacklisted

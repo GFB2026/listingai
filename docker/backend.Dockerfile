@@ -1,19 +1,35 @@
-FROM python:3.12-slim
+# ---------- builder ----------
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ---------- runtime ----------
+FROM python:3.12-slim AS runtime
 
 LABEL org.opencontainers.image.title="ListingAI Backend"
 LABEL org.opencontainers.image.description="FastAPI backend for ListingAI - AI-powered real estate content engine"
 LABEL org.opencontainers.image.source="https://github.com/galt-ocean-realty/listingai"
 
-WORKDIR /app
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
+    libpq5 \
     tini \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 COPY backend/ .
 
@@ -31,7 +47,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
-# --- Test stage: includes dev dependencies, still runs as appuser ---
+# ---------- test ----------
 FROM python:3.12-slim AS test
 
 WORKDIR /app

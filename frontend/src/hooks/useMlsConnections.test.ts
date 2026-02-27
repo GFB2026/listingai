@@ -7,6 +7,7 @@ import {
   useMlsConnections,
   useMlsConnectionStatus,
   useCreateMlsConnection,
+  useUpdateMlsConnection,
   useTestMlsConnection,
   useDeleteMlsConnection,
 } from "./useMlsConnections";
@@ -100,6 +101,53 @@ describe("useCreateMlsConnection", () => {
         base_url: "https://bad.com",
         client_id: "x",
         client_secret: "x",
+      });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts.some((t) => t.variant === "error")).toBe(true);
+  });
+});
+
+describe("useUpdateMlsConnection", () => {
+  beforeEach(() => {
+    useToastStore.setState({ toasts: [] });
+  });
+
+  it("updates connection and shows success toast", async () => {
+    const { result } = renderHook(() => useUpdateMlsConnection(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        id: "mls-1",
+        name: "Updated MLS",
+        sync_enabled: false,
+      });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts.some((t) => t.variant === "success")).toBe(true);
+  });
+
+  it("shows error toast on update failure", async () => {
+    server.use(
+      http.patch("http://localhost:8000/api/v1/mls-connections/:id", () =>
+        HttpResponse.json({ detail: "Invalid" }, { status: 400 })
+      )
+    );
+
+    const { result } = renderHook(() => useUpdateMlsConnection(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        id: "mls-1",
+        name: "Bad Update",
       });
     });
 

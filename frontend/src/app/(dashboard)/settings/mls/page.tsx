@@ -6,6 +6,7 @@ import {
   useMlsConnections,
   useCreateMlsConnection,
   useTestMlsConnection,
+  useUpdateMlsConnection,
   useDeleteMlsConnection,
   useMlsConnectionStatus,
 } from "@/hooks/useMlsConnections";
@@ -14,6 +15,7 @@ export default function MLSSettingsPage() {
   const { data, isLoading } = useMlsConnections();
   const createMutation = useCreateMlsConnection();
   const testMutation = useTestMlsConnection();
+  const updateMutation = useUpdateMlsConnection();
   const deleteMutation = useDeleteMlsConnection();
 
   const [form, setForm] = useState({
@@ -28,6 +30,14 @@ export default function MLSSettingsPage() {
     message: string;
   } | null>(null);
   const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    base_url: "",
+    client_id: "",
+    client_secret: "",
+    sync_enabled: false,
+  });
 
   const { data: statusData } = useMlsConnectionStatus(selectedStatusId);
 
@@ -89,6 +99,55 @@ export default function MLSSettingsPage() {
       if (selectedStatusId === connectionId) setSelectedStatusId(null);
     } catch {
       setFeedback({ type: "error", message: "Failed to delete connection." });
+    }
+  };
+
+  const startEditing = (conn: {
+    id: string;
+    name: string | null;
+    base_url: string;
+    sync_enabled: boolean;
+  }) => {
+    setEditingId(conn.id);
+    setEditForm({
+      name: conn.name || "",
+      base_url: conn.base_url,
+      client_id: "",
+      client_secret: "",
+      sync_enabled: conn.sync_enabled,
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+  };
+
+  const handleEditSave = async (connectionId: string, original: {
+    name: string | null;
+    base_url: string;
+    sync_enabled: boolean;
+  }) => {
+    setFeedback(null);
+
+    const payload: Record<string, string | boolean> = { id: connectionId };
+    if (editForm.name !== (original.name || "")) payload.name = editForm.name;
+    if (editForm.base_url !== original.base_url) payload.base_url = editForm.base_url;
+    if (editForm.client_id) payload.client_id = editForm.client_id;
+    if (editForm.client_secret) payload.client_secret = editForm.client_secret;
+    if (editForm.sync_enabled !== original.sync_enabled) payload.sync_enabled = editForm.sync_enabled;
+
+    // Only id in payload means nothing changed
+    if (Object.keys(payload).length === 1) {
+      setEditingId(null);
+      return;
+    }
+
+    try {
+      await updateMutation.mutateAsync(payload as { id: string; name?: string; base_url?: string; client_id?: string; client_secret?: string; sync_enabled?: boolean });
+      setFeedback({ type: "success", message: "Connection updated." });
+      setEditingId(null);
+    } catch {
+      setFeedback({ type: "error", message: "Failed to update connection." });
     }
   };
 
@@ -223,47 +282,149 @@ export default function MLSSettingsPage() {
               {connections.map((conn) => (
                 <div
                   key={conn.id}
-                  className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-4"
+                  className="rounded-lg border border-gray-100 bg-gray-50 p-4"
                 >
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {conn.name || conn.provider}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {conn.provider} &middot; {conn.base_url}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {conn.sync_enabled ? "Sync enabled" : "Sync disabled"}
-                      {conn.last_sync_at &&
-                        ` · Last sync: ${new Date(conn.last_sync_at).toLocaleString()}`}
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {conn.name || conn.provider}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {conn.provider} &middot; {conn.base_url}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {conn.sync_enabled ? "Sync enabled" : "Sync disabled"}
+                        {conn.last_sync_at &&
+                          ` · Last sync: ${new Date(conn.last_sync_at).toLocaleString()}`}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() =>
+                          setSelectedStatusId(
+                            selectedStatusId === conn.id ? null : conn.id
+                          )
+                        }
+                        className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        Status
+                      </button>
+                      <button
+                        onClick={() => startEditing(conn)}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleTest(conn.id)}
+                        disabled={testMutation.isPending}
+                        className="rounded border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        {testMutation.isPending ? "Testing..." : "Test"}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(conn.id)}
+                        disabled={deleteMutation.isPending}
+                        className="rounded border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() =>
-                        setSelectedStatusId(
-                          selectedStatusId === conn.id ? null : conn.id
-                        )
-                      }
-                      className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
-                    >
-                      Status
-                    </button>
-                    <button
-                      onClick={() => handleTest(conn.id)}
-                      disabled={testMutation.isPending}
-                      className="rounded border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
-                    >
-                      {testMutation.isPending ? "Testing..." : "Test"}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(conn.id)}
-                      disabled={deleteMutation.isPending}
-                      className="rounded border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
+
+                  {editingId === conn.id && (
+                    <div className="mt-4 space-y-4 border-t border-gray-200 pt-4">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          Connection Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.name}
+                          onChange={(e) =>
+                            setEditForm((f) => ({ ...f, name: e.target.value }))
+                          }
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          API Base URL
+                        </label>
+                        <input
+                          type="url"
+                          value={editForm.base_url}
+                          onChange={(e) =>
+                            setEditForm((f) => ({ ...f, base_url: e.target.value }))
+                          }
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          Client ID
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.client_id}
+                          onChange={(e) =>
+                            setEditForm((f) => ({ ...f, client_id: e.target.value }))
+                          }
+                          placeholder="&#8226;&#8226;&#8226;&#8226;"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          Client Secret
+                        </label>
+                        <input
+                          type="password"
+                          value={editForm.client_secret}
+                          onChange={(e) =>
+                            setEditForm((f) => ({ ...f, client_secret: e.target.value }))
+                          }
+                          placeholder="Enter new secret to update"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`sync-enabled-${conn.id}`}
+                          checked={editForm.sync_enabled}
+                          onChange={(e) =>
+                            setEditForm((f) => ({
+                              ...f,
+                              sync_enabled: e.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <label
+                          htmlFor={`sync-enabled-${conn.id}`}
+                          className="text-sm font-medium text-gray-700"
+                        >
+                          Sync Enabled
+                        </label>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditSave(conn.id, conn)}
+                          disabled={updateMutation.isPending}
+                          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-light disabled:opacity-50"
+                        >
+                          {updateMutation.isPending ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

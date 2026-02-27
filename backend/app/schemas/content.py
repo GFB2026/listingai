@@ -31,10 +31,10 @@ class Tone(StrEnum):
 
 
 class ContentGenerateRequest(BaseModel):
-    listing_id: str
+    listing_id: UUID
     content_type: ContentType
     tone: Tone = Tone.PROFESSIONAL
-    brand_profile_id: str | None = None
+    brand_profile_id: UUID | None = None
     instructions: str | None = Field(default=None, max_length=2000)
     event_details: str | None = Field(default=None, max_length=2000)
     variants: int = Field(default=1, ge=1, le=5)
@@ -88,14 +88,29 @@ class ContentBatchRequest(BaseModel):
 
     @field_validator("listing_ids")
     @classmethod
-    def deduplicate_listing_ids(cls, v: list[str]) -> list[str]:
+    def validate_and_deduplicate_listing_ids(cls, v: list[str]) -> list[str]:
         seen: set[str] = set()
         unique: list[str] = []
         for lid in v:
+            # Validate UUID format
+            try:
+                UUID(lid)
+            except ValueError as e:
+                raise ValueError(f"Invalid UUID: {lid}") from e
             if lid not in seen:
                 seen.add(lid)
                 unique.append(lid)
         return unique
+
+    @field_validator("brand_profile_id")
+    @classmethod
+    def validate_brand_profile_uuid(cls, v: str | None) -> str | None:
+        if v is not None:
+            try:
+                UUID(v)
+            except ValueError as e:
+                raise ValueError(f"Invalid UUID: {v}") from e
+        return v
 
 
 class BatchQueueResponse(BaseModel):

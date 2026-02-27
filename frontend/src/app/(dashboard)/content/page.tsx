@@ -1,15 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import { useContent, type ContentItem } from "@/hooks/useContent";
+import {
+  useContent,
+  useDeleteContent,
+  useRegenerateContent,
+  type ContentItem,
+} from "@/hooks/useContent";
+import { useToastStore } from "@/hooks/useToast";
 import { CONTENT_TYPES } from "@/lib/utils";
 import Link from "next/link";
 
 export default function ContentLibraryPage() {
   const [contentType, setContentType] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useContent({ content_type: contentType, page });
+  const { data, isLoading } = useContent({
+    content_type: contentType,
+    status: statusFilter,
+    page,
+  });
+
+  const deleteContent = useDeleteContent();
+  const regenerateContent = useRegenerateContent();
+
+  const handleCopy = async (body: string) => {
+    try {
+      await navigator.clipboard.writeText(body);
+      useToastStore.getState().toast({
+        title: "Copied",
+        description: "Content copied to clipboard.",
+        variant: "success",
+      });
+    } catch {
+      useToastStore.getState().toast({
+        title: "Copy failed",
+        description: "Could not copy to clipboard.",
+        variant: "error",
+      });
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this content?")) {
+      deleteContent.mutate(id);
+    }
+  };
 
   return (
     <div>
@@ -31,6 +68,20 @@ export default function ContentLibraryPage() {
               {ct.label}
             </option>
           ))}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="approved">Approved</option>
+          <option value="published">Published</option>
         </select>
       </div>
 
@@ -91,12 +142,37 @@ export default function ContentLibraryPage() {
                     {new Date(item.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/content`}
-                      className="text-primary hover:underline"
-                    >
-                      View
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      {item.listing_id ? (
+                        <Link
+                          href={`/listings/${item.listing_id}/content`}
+                          className="text-primary hover:underline"
+                        >
+                          View
+                        </Link>
+                      ) : (
+                        <span className="text-gray-400">View</span>
+                      )}
+                      <button
+                        onClick={() => handleCopy(item.body)}
+                        className="text-gray-600 hover:text-gray-900 hover:underline"
+                      >
+                        Copy
+                      </button>
+                      <button
+                        onClick={() => regenerateContent.mutate(item.id)}
+                        disabled={regenerateContent.isPending}
+                        className="text-gray-600 hover:text-gray-900 hover:underline disabled:opacity-50"
+                      >
+                        Regenerate
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="text-red-600 hover:text-red-800 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

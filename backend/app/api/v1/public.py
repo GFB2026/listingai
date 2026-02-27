@@ -21,9 +21,18 @@ router = APIRouter()
 
 
 def _client_ip(request: Request) -> str:
+    """Extract client IP, validating X-Forwarded-For format."""
+    import ipaddress
+
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        candidate = forwarded.split(",")[0].strip()
+        # Validate it looks like an IP address (prevent header injection)
+        try:
+            ipaddress.ip_address(candidate)
+            return candidate
+        except ValueError:
+            pass  # Fall through to direct client IP
     return request.client.host if request.client else "unknown"
 
 
@@ -100,7 +109,7 @@ async def get_agent_page(
 async def get_listing_landing(
     tenant_slug: str,
     agent_slug: str,
-    listing_id: str,
+    listing_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
     """Public listing-specific landing page data."""
@@ -126,7 +135,7 @@ async def get_listing_landing(
 
     result = await db.execute(
         select(Listing).where(
-            Listing.id == UUID(listing_id),
+            Listing.id == listing_id,
             Listing.tenant_id == tenant.id,
         )
     )
@@ -183,8 +192,6 @@ async def submit_lead(
 
     tenant, agent_page = resolved
 
-    listing_id = UUID(payload.listing_id) if payload.listing_id else None
-
     lead = await service.create_lead_public(
         tenant,
         agent_page,
@@ -194,7 +201,7 @@ async def submit_lead(
         phone=payload.phone,
         message=payload.message,
         property_interest=payload.property_interest,
-        listing_id=listing_id,
+        listing_id=payload.listing_id,
         utm_source=payload.utm_source,
         utm_medium=payload.utm_medium,
         utm_campaign=payload.utm_campaign,
@@ -223,12 +230,10 @@ async def record_visit(
 
     tenant, agent_page = resolved
 
-    listing_id = UUID(payload.listing_id) if payload.listing_id else None
-
     await service.record_visit(
         tenant,
         agent_page,
-        listing_id=listing_id,
+        listing_id=payload.listing_id,
         session_id=payload.session_id,
         utm_source=payload.utm_source,
         utm_medium=payload.utm_medium,
@@ -282,12 +287,12 @@ async def get_link_config(
     for page in agent_pages:
         agent_listings = [
             {
-                "id": str(l.id),
-                "mls_id": l.mls_listing_id,
-                "address": l.address_full,
+                "id": str(listing.id),
+                "mls_id": listing.mls_listing_id,
+                "address": listing.address_full,
             }
-            for l in listings
-            if l.listing_agent_id == page.user_id
+            for listing in listings
+            if listing.listing_agent_id == page.user_id
         ]
         agents.append({
             "slug": page.slug,

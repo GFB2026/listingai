@@ -1,5 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import api from "@/lib/api";
+import { useToastStore } from "@/hooks/useToast";
 
 export interface Listing {
   id: string;
@@ -21,6 +23,11 @@ export interface Listing {
   photos: Array<{ url: string; caption?: string }>;
   listing_agent_id: string | null;
   listing_agent_name: string | null;
+  listing_agent_email?: string;
+  listing_agent_phone?: string;
+  previous_price?: number | null;
+  close_price?: number | null;
+  close_date?: string | null;
   mls_listing_id: string | null;
   created_at: string;
 }
@@ -74,5 +81,56 @@ export function useListing(id: string) {
       return res.data;
     },
     enabled: !!id,
+  });
+}
+
+function getErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.detail || error.message;
+  }
+  return error instanceof Error ? error.message : "An unexpected error occurred";
+}
+
+export interface ListingCreateData {
+  address_full: string;
+  address_street?: string;
+  address_city?: string;
+  address_state?: string;
+  address_zip?: string;
+  price?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  sqft?: number;
+  lot_sqft?: number;
+  year_built?: number;
+  property_type?: string;
+  status?: string;
+  description_original?: string;
+  features?: string[];
+}
+
+export function useCreateListing() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Listing, Error, ListingCreateData>({
+    mutationFn: async (data) => {
+      const res = await api.post("/listings/manual", data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+      useToastStore.getState().toast({
+        title: "Listing created",
+        description: "Listing has been created successfully.",
+        variant: "success",
+      });
+    },
+    onError: (error: Error) => {
+      useToastStore.getState().toast({
+        title: "Creation failed",
+        description: getErrorMessage(error),
+        variant: "error",
+      });
+    },
   });
 }

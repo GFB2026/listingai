@@ -6,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_tenant_db
-from app.models.listing import Listing
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.services.social_service import SocialService
@@ -18,8 +17,8 @@ router = APIRouter()
 
 
 class SocialPostRequest(BaseModel):
-    listing_id: str | None = None
-    content_id: str | None = None
+    listing_id: UUID | None = None
+    content_id: UUID | None = None
     fb_text: str | None = Field(default=None, max_length=5000)
     ig_text: str | None = Field(default=None, max_length=2200)
     photo_url: str | None = Field(default=None, max_length=2000)
@@ -60,7 +59,11 @@ async def publish_social_post(
     if not service:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Social media credentials not configured. Set page_access_token and facebook_page_id in tenant settings.",
+            detail=(
+                "Social media credentials not configured."
+                " Set page_access_token and facebook_page_id"
+                " in tenant settings."
+            ),
         )
 
     if not request.fb_text and not request.ig_text:
@@ -76,8 +79,8 @@ async def publish_social_post(
         ig_text=request.ig_text,
         photo_url=request.photo_url,
         listing_link=request.listing_link,
-        content_id=UUID(request.content_id) if request.content_id else None,
-        listing_id=UUID(request.listing_id) if request.listing_id else None,
+        content_id=request.content_id,
+        listing_id=request.listing_id,
         user_id=user.id,
     )
 

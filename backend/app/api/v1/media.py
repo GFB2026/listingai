@@ -1,4 +1,5 @@
 import uuid
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -36,6 +37,7 @@ MAGIC_BYTES = {
     "image/jpeg": [b"\xff\xd8"],
     "image/png": [b"\x89\x50\x4e\x47"],
     "image/webp": [b"RIFF"],  # Full check includes WEBP at offset 8
+    "application/pdf": [b"%PDF"],
 }
 
 
@@ -43,7 +45,7 @@ def _validate_magic_bytes(content_type: str, data: bytes) -> bool:
     """Validate file content matches its declared MIME type via magic bytes."""
     signatures = MAGIC_BYTES.get(content_type)
     if signatures is None:
-        # No magic byte check for this type (e.g. PDF)
+        # No magic byte check defined for this content type
         return True
     for sig in signatures:
         if data[:len(sig)] == sig:
@@ -85,19 +87,25 @@ async def upload_media(
     safe_filename = f"{uuid.uuid4()}"
 
     media_service = MediaService()
-    result = await media_service.upload_validated(
-        contents=contents,
-        filename=safe_filename,
-        content_type=content_type,
-        tenant_id=str(user.tenant_id),
-    )
+    try:
+        result = await media_service.upload_validated(
+            contents=contents,
+            filename=safe_filename,
+            content_type=content_type,
+            tenant_id=str(user.tenant_id),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="File storage unavailable. Please try again.",
+        ) from exc
     return result
 
 
 @router.get("/{media_id}", response_model=MediaPresignedResponse)
 async def get_media(
-    media_id: str,
+    media_id: UUID,
     user: User = Depends(get_current_user),
 ):
     media_service = MediaService()
-    return await media_service.get_presigned_url(media_id, str(user.tenant_id))
+    return await media_service.get_presigned_url(str(media_id), str(user.tenant_id))

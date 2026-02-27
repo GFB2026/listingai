@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,7 +157,11 @@ class TestAIService:
         listing.listing_agent_name = None
 
         db = AsyncMock()
-        db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
+        db.execute = AsyncMock(
+            return_value=MagicMock(
+                scalar_one_or_none=MagicMock(return_value=None),
+            ),
+        )
 
         with patch.object(AIService, "__init__", lambda self: None):
             service = AIService()
@@ -166,6 +169,8 @@ class TestAIService:
             service.client.messages.create = AsyncMock(return_value=mock_response)
             from app.services.prompt_builder import PromptBuilder
             service.prompt_builder = PromptBuilder()
+            service._default_model = "claude-sonnet-4-5-20250929"
+            service._model_map = {"listing_description": service._default_model}
 
             # Also reset circuit breaker for clean test
             from app.services import ai_service
@@ -200,13 +205,19 @@ class TestAIService:
 
         listing = MagicMock()
         db = AsyncMock()
-        db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
+        db.execute = AsyncMock(
+            return_value=MagicMock(
+                scalar_one_or_none=MagicMock(return_value=None),
+            ),
+        )
 
         with patch.object(AIService, "__init__", lambda self: None):
             service = AIService()
             service.prompt_builder = MagicMock()
             service.prompt_builder.build = MagicMock(return_value=("system", "user"))
             service.client = AsyncMock()
+            service._default_model = "claude-sonnet-4-5-20250929"
+            service._model_map = {}
 
             with pytest.raises(CircuitBreakerOpenError):
                 await service.generate(

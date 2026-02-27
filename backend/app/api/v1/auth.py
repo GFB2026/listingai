@@ -22,7 +22,7 @@ from app.core.security import (
     set_auth_cookies,
     verify_password,
 )
-from app.core.token_blacklist import blacklist_token
+from app.core.token_blacklist import blacklist_token, is_token_blacklisted
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.auth import (
@@ -137,12 +137,25 @@ async def refresh(
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
+    # Check if this refresh token has been blacklisted (already rotated)
+    old_jti = payload.get("jti")
+    old_iat = payload.get("iat")
+    if old_jti and await is_token_blacklisted(old_jti, iat=old_iat):
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+
     user_id = payload.get("sub")
     result = await db.execute(select(User).where(User.id == UUID(user_id)))
     user = result.scalar_one_or_none()
 
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    # Blacklist the old refresh token so it can't be replayed
+    if old_jti:
+        old_exp = payload.get("exp", 0)
+        old_ttl = max(0, int(old_exp - time.time()))
+        if old_ttl > 0:
+            await blacklist_token(old_jti, old_ttl)
 
     access_token = create_access_token(
         data={"sub": str(user.id), "tenant_id": str(user.tenant_id), "role": user.role}

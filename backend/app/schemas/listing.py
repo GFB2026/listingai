@@ -24,6 +24,11 @@ class ListingResponse(BaseModel):
     photos: list | None
     list_date: date | None
     listing_agent_name: str | None
+    listing_agent_email: str | None = None
+    listing_agent_phone: str | None = None
+    previous_price: Decimal | None = None
+    close_price: Decimal | None = None
+    close_date: date | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

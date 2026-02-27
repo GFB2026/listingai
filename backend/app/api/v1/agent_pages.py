@@ -55,7 +55,7 @@ async def create_agent_page(
         raise HTTPException(status_code=400, detail="Slug already in use")
 
     # Check user exists in tenant
-    target_user_id = UUID(payload.user_id)
+    target_user_id = payload.user_id
     user_result = await db.execute(
         select(User).where(
             User.id == target_user_id,
@@ -93,7 +93,7 @@ async def create_agent_page(
 
 @router.patch("/{page_id}", response_model=AgentPageResponse)
 async def update_agent_page(
-    page_id: str,
+    page_id: UUID,
     update: AgentPageUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
@@ -101,7 +101,7 @@ async def update_agent_page(
     """Update an agent page. Broker/admin can update any; agents can update their own."""
     result = await db.execute(
         select(AgentPage).where(
-            AgentPage.id == UUID(page_id),
+            AgentPage.id == page_id,
             AgentPage.tenant_id == user.tenant_id,
         )
     )
@@ -147,14 +147,14 @@ async def update_agent_page(
 
 @router.delete("/{page_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_agent_page(
-    page_id: str,
+    page_id: UUID,
     user: User = Depends(require_role("admin", "broker")),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Deactivate an agent page (soft delete)."""
     result = await db.execute(
         select(AgentPage).where(
-            AgentPage.id == UUID(page_id),
+            AgentPage.id == page_id,
             AgentPage.tenant_id == user.tenant_id,
         )
     )

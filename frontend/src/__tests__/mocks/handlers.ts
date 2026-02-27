@@ -97,6 +97,16 @@ export const handlers = [
     if (params.id === "c1") return HttpResponse.json(mockContentItem);
     return new HttpResponse(null, { status: 404 });
   }),
+  http.patch(`${BASE}/content/:id`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ ...mockContentItem, ...body });
+  }),
+  http.delete(`${BASE}/content/:id`, () =>
+    new HttpResponse(null, { status: 204 })
+  ),
+  http.post(`${BASE}/content/:id/regenerate`, () =>
+    HttpResponse.json({ ...mockContentItem, version: 2 })
+  ),
   http.post(`${BASE}/content/generate`, () =>
     HttpResponse.json([mockContentItem])
   ),
@@ -123,6 +133,9 @@ export const handlers = [
   http.post(`${BASE}/mls-connections`, () => HttpResponse.json(mockMlsConnection)),
   http.post(`${BASE}/mls-connections/:id/test`, () =>
     HttpResponse.json({ success: true, message: "Connected", property_count: 42 })
+  ),
+  http.patch(`${BASE}/mls-connections/:id`, () =>
+    HttpResponse.json(mockMlsConnection)
   ),
   http.delete(`${BASE}/mls-connections/:id`, () =>
     new HttpResponse(null, { status: 204 })

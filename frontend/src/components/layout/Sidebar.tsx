@@ -12,9 +12,12 @@ const navItems = [
   { href: "/leads", label: "Leads", icon: "T" },
   { href: "/leads/analytics", label: "Analytics", icon: "A" },
   { href: "/brand", label: "Brand", icon: "B" },
+  { href: "/email", label: "Email", icon: "E" },
+  { href: "/social", label: "Social", icon: "F" },
   { href: "/settings", label: "Settings", icon: "S" },
   { href: "/settings/mls", label: "MLS", icon: "M" },
   { href: "/settings/agent-pages", label: "Agent Pages", icon: "P" },
+  { href: "/settings/users", label: "Team", icon: "U" },
   { href: "/billing", label: "Billing", icon: "$" },
 ];
 

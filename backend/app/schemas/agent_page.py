@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_serializer
 
 
 class AgentPageCreate(BaseModel):
-    user_id: str
+    user_id: UUID
     slug: str = Field(..., min_length=2, max_length=100, pattern=r"^[a-z0-9\-]+$")
     headline: str | None = Field(default=None, max_length=255)
     bio: str | None = Field(default=None, max_length=2000)

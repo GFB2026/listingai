@@ -21,7 +21,11 @@ export default function ContentGeneratorPage({
   const [tone, setTone] = useState("professional");
   const [brandProfileId, setBrandProfileId] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
+  const [eventDetails, setEventDetails] = useState("");
   const [variants, setVariants] = useState(1);
+
+  const EVENT_CONTENT_TYPES = ["open_house_invite", "price_reduction", "just_sold"];
+  const isEventType = EVENT_CONTENT_TYPES.includes(contentType);
 
   const { data: listing } = useListing(id);
 
@@ -34,6 +38,7 @@ export default function ContentGeneratorPage({
       tone,
       brand_profile_id: brandProfileId,
       instructions: instructions || undefined,
+      event_details: isEventType && eventDetails ? eventDetails : undefined,
       variants,
     });
   };
@@ -76,6 +81,28 @@ export default function ContentGeneratorPage({
 
           {/* Content Type */}
           <ContentTypeSelector value={contentType} onChange={setContentType} />
+
+          {/* Event Details (conditional) */}
+          {isEventType && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Event Details
+              </label>
+              <textarea
+                value={eventDetails}
+                onChange={(e) => setEventDetails(e.target.value)}
+                rows={3}
+                placeholder={
+                  contentType === "open_house_invite"
+                    ? "e.g. Saturday March 8, 1-4 PM. Light refreshments served."
+                    : contentType === "price_reduction"
+                      ? "e.g. Reduced from $1.2M to $999K. Motivated seller."
+                      : "e.g. Sold for $1.1M after 12 days on market. Multiple offers."
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          )}
 
           {/* Tone */}
           <ToneSelector value={tone} onChange={setTone} />

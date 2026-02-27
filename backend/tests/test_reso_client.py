@@ -141,6 +141,8 @@ class TestFromConnection:
         mock_conn.base_url = "https://api.example.com"
         mock_conn.client_id_encrypted = b"enc_id"
         mock_conn.client_secret_encrypted = b"enc_secret"
+        mock_conn.provider = "trestle"
+        mock_conn.settings = None
 
         with patch(
             "app.integrations.mls.reso_client.decrypt_value",
@@ -151,3 +153,56 @@ class TestFromConnection:
         assert client.client_id == "my_id"
         assert client.client_secret == "my_secret"
         assert client.base_url == "https://api.example.com"
+        assert client.provider == "trestle"
+
+    def test_from_connection_bridge_with_dataset(self):
+        mock_conn = MagicMock()
+        mock_conn.base_url = "https://api.bridgedataoutput.com"
+        mock_conn.client_id_encrypted = b"enc_id"
+        mock_conn.client_secret_encrypted = b"enc_secret"
+        mock_conn.provider = "bridge"
+        mock_conn.settings = {"dataset": "test"}
+
+        with patch(
+            "app.integrations.mls.reso_client.decrypt_value",
+            side_effect=["my_id", "my_token"],
+        ):
+            client = RESOClient.from_connection(mock_conn)
+
+        assert client.provider == "bridge"
+        assert client._property_path == "/api/v2/OData/test/Property"
+        assert client._media_path == "/api/v2/OData/test/Media"
+
+
+class TestBridgeProvider:
+    @pytest.mark.asyncio
+    async def test_bridge_authenticate_uses_server_token(self):
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "server_token_abc",
+            provider="bridge",
+        )
+        token = await client.authenticate()
+
+        assert token == "server_token_abc"
+        assert client.access_token == "server_token_abc"
+        await client.close()
+
+    def test_bridge_paths_without_dataset(self):
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "secret",
+            provider="bridge",
+        )
+        assert client._property_path == "/api/v2/OData/Property"
+        assert client._media_path == "/api/v2/OData/Media"
+
+    def test_bridge_paths_with_dataset(self):
+        client = RESOClient(
+            "https://api.bridgedataoutput.com", "id", "secret",
+            provider="bridge", dataset="test",
+        )
+        assert client._property_path == "/api/v2/OData/test/Property"
+        assert client._media_path == "/api/v2/OData/test/Media"
+
+    def test_unknown_provider_raises(self):
+        with pytest.raises(ValueError, match="Unknown MLS provider"):
+            RESOClient("https://example.com", "id", "secret", provider="invalid")

@@ -4,7 +4,6 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.email_campaign import EmailCampaign

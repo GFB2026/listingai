@@ -8,7 +8,7 @@ import pytest
 class TestConfigValidation:
     def test_production_rejects_empty_secrets(self):
         """Production mode should raise ValueError when required secrets are empty."""
-        from app.config import Settings, get_settings
+        from app.config import get_settings
 
         # Clear lru_cache
         get_settings.cache_clear()
@@ -70,6 +70,8 @@ class TestConfigValidation:
             "STRIPE_SECRET_KEY": "sk_live_real",
             "STRIPE_PUBLISHABLE_KEY": "pk_live_real",
             "STRIPE_WEBHOOK_SECRET": "whsec_real",
+            "SENDGRID_API_KEY": "SG.real-key",
+            "SENDGRID_DEFAULT_FROM_EMAIL": "noreply@example.com",
         }
 
         with patch.dict(os.environ, env, clear=False):

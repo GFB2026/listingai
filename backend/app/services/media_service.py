@@ -1,9 +1,13 @@
 import uuid
 
 import boto3
+import botocore.exceptions
+import structlog
 from fastapi import UploadFile
 
 from app.config import get_settings
+
+logger = structlog.get_logger()
 
 
 class MediaService:
@@ -24,12 +28,16 @@ class MediaService:
         key = f"{tenant_id}/{file_id}.{ext}"
 
         contents = await file.read()
-        self.s3.put_object(
-            Bucket=self.bucket,
-            Key=key,
-            Body=contents,
-            ContentType=file.content_type or "application/octet-stream",
-        )
+        try:
+            self.s3.put_object(
+                Bucket=self.bucket,
+                Key=key,
+                Body=contents,
+                ContentType=file.content_type or "application/octet-stream",
+            )
+        except botocore.exceptions.ClientError:
+            logger.error("s3_upload_failed", key=key, exc_info=True)
+            raise
 
         return {
             "media_id": file_id,
@@ -53,12 +61,16 @@ class MediaService:
         ext = ext_map.get(content_type, "bin")
         key = f"{tenant_id}/{filename}.{ext}"
 
-        self.s3.put_object(
-            Bucket=self.bucket,
-            Key=key,
-            Body=contents,
-            ContentType=content_type,
-        )
+        try:
+            self.s3.put_object(
+                Bucket=self.bucket,
+                Key=key,
+                Body=contents,
+                ContentType=content_type,
+            )
+        except botocore.exceptions.ClientError:
+            logger.error("s3_upload_validated_failed", key=key, exc_info=True)
+            raise
 
         return {
             "media_id": filename,
@@ -116,11 +128,15 @@ class MediaService:
         ext = filename.split(".")[-1] if filename else "jpg"
         key = f"{tenant_id}/mls/{file_id}.{ext}"
 
-        self.s3.put_object(
-            Bucket=self.bucket,
-            Key=key,
-            Body=content,
-            ContentType=content_type,
-        )
+        try:
+            self.s3.put_object(
+                Bucket=self.bucket,
+                Key=key,
+                Body=content,
+                ContentType=content_type,
+            )
+        except botocore.exceptions.ClientError:
+            logger.error("s3_download_upload_failed", key=key, url=url, exc_info=True)
+            raise
 
         return {"media_id": file_id, "key": key}

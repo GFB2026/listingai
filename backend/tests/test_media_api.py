@@ -84,7 +84,13 @@ class TestUploadMedia:
         response = await client.post(
             "/api/v1/media/upload",
             headers=headers,
-            files={"file": ("file.exe", io.BytesIO(b"MZ" + b"\x00" * 100), "application/octet-stream")},
+            files={
+                "file": (
+                    "file.exe",
+                    io.BytesIO(b"MZ" + b"\x00" * 100),
+                    "application/octet-stream",
+                ),
+            },
         )
         assert response.status_code == 400
         assert "not allowed" in response.json()["detail"]

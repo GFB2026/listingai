@@ -12,7 +12,8 @@ BODY RULES:
 - Include a 3-5 item highlight list (beds, baths, sqft, top features)
 - One short paragraph on lifestyle/neighborhood (2-3 sentences)
 - Sign off with the listing agent's name and brokerage (from the listing data)
-- Use the agent's actual phone and email in the sign-off — NEVER write "[Contact Information]" or similar placeholders
+- Use the agent's actual phone and email in the sign-off \
+— NEVER write "[Contact Information]" or similar placeholders
 - End with CTA: "Schedule a private showing" or "Reply for details"
 - 200-350 words for the body
 - Tone: {tone}

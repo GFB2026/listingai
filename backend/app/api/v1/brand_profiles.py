@@ -64,14 +64,14 @@ async def create_brand_profile(
 
 @router.patch("/{profile_id}", response_model=BrandProfileResponse)
 async def update_brand_profile(
-    profile_id: str,
+    profile_id: UUID,
     update: BrandProfileUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(
         select(BrandProfile).where(
-            BrandProfile.id == UUID(profile_id),
+            BrandProfile.id == profile_id,
             BrandProfile.tenant_id == user.tenant_id,
         )
     )
@@ -102,13 +102,13 @@ async def update_brand_profile(
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_brand_profile(
-    profile_id: str,
+    profile_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(
         select(BrandProfile).where(
-            BrandProfile.id == UUID(profile_id),
+            BrandProfile.id == profile_id,
             BrandProfile.tenant_id == user.tenant_id,
         )
     )

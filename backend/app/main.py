@@ -49,12 +49,14 @@ def create_app() -> FastAPI:
             send_default_pii=False,
         )
 
+    is_prod = settings.app_env == "production"
+
     app = FastAPI(
         title="ListingAI",
         description="AI-Powered Real Estate Content Engine",
         version="0.1.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=None if is_prod else "/docs",
+        redoc_url=None if is_prod else "/redoc",
         lifespan=lifespan,
     )
 
@@ -148,15 +150,16 @@ def create_app() -> FastAPI:
         """Backward-compatible health check — delegates to readiness."""
         return await readiness_check()
 
-    @app.get("/metrics")
-    async def metrics():
-        """Prometheus metrics endpoint."""
-        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-        from starlette.responses import Response as StarletteResponse
-        return StarletteResponse(
-            content=generate_latest(),
-            media_type=CONTENT_TYPE_LATEST,
-        )
+    if not is_prod:
+        @app.get("/metrics")
+        async def metrics():
+            """Prometheus metrics endpoint (disabled in production — use a dedicated exporter)."""
+            from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+            from starlette.responses import Response as StarletteResponse
+            return StarletteResponse(
+                content=generate_latest(),
+                media_type=CONTENT_TYPE_LATEST,
+            )
 
     # --- Exception handlers ---
 

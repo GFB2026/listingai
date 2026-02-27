@@ -18,7 +18,7 @@ Layout:
 
 import io
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import structlog
@@ -669,7 +669,7 @@ def build_flyer_pdf(
                      y=y + 3.0 + i * (fs * 0.42), text=_sanitize_text(line))
 
     pdf.set_font("Helvetica", "B", fs)
-    right_lines = [l for l in [branding.brokerage_phone, branding.brokerage_website] if l]
+    right_lines = [v for v in [branding.brokerage_phone, branding.brokerage_website] if v]
     for i, line in enumerate(right_lines):
         lw = pdf.get_string_width(line)
         pdf.text(x=MARGIN + 2 * col_w + (col_w - lw),

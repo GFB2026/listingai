@@ -11,7 +11,7 @@ class LeadCreate(BaseModel):
     """Public lead form submission."""
     tenant_slug: str = Field(..., max_length=100)
     agent_slug: str = Field(..., max_length=100)
-    listing_id: str | None = None
+    listing_id: UUID | None = None
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
@@ -34,7 +34,7 @@ class PageVisitCreate(BaseModel):
     """Public page visit tracking."""
     tenant_slug: str = Field(..., max_length=100)
     agent_slug: str = Field(..., max_length=100)
-    listing_id: str | None = None
+    listing_id: UUID | None = None
     session_id: str | None = Field(default=None, max_length=100)
     utm_source: str | None = Field(default=None, max_length=200)
     utm_medium: str | None = Field(default=None, max_length=200)

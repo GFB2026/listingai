@@ -1,10 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach } from "vitest";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { server } from "@/__tests__/mocks/server";
 import { createWrapper } from "@/__tests__/test-utils";
-import { useListings, useListing } from "./useListings";
+import { useListings, useListing, useCreateListing } from "./useListings";
 import { mockListing } from "@/__tests__/mocks/handlers";
+import { useToastStore } from "./useToast";
+
+const BASE = "http://localhost:8000/api/v1";
 
 describe("useListings", () => {
   it("fetches listings", async () => {
@@ -90,5 +93,55 @@ describe("useListing", () => {
       wrapper: createWrapper(),
     });
     expect(result.current.fetchStatus).toBe("idle");
+  });
+});
+
+describe("useCreateListing", () => {
+  beforeEach(() => {
+    useToastStore.setState({ toasts: [] });
+    server.use(
+      http.post(`${BASE}/listings/manual`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          { ...mockListing, ...body, id: "lst-new" },
+          { status: 201 }
+        );
+      })
+    );
+  });
+
+  it("creates listing and shows success toast", async () => {
+    const { result } = renderHook(() => useCreateListing(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({ address_full: "456 New St, Miami, FL 33101" });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.address_full).toBe("456 New St, Miami, FL 33101");
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts.some((t) => t.variant === "success")).toBe(true);
+  });
+
+  it("shows error toast on failure", async () => {
+    server.use(
+      http.post(`${BASE}/listings/manual`, () =>
+        HttpResponse.json({ detail: "Invalid data" }, { status: 400 })
+      )
+    );
+
+    const { result } = renderHook(() => useCreateListing(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({ address_full: "" });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts.some((t) => t.variant === "error")).toBe(true);
   });
 });

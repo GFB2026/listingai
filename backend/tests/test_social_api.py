@@ -157,7 +157,8 @@ class TestSocialPostValidation:
             json={},
         )
         assert resp.status_code == 400
-        assert "fb_text" in resp.json()["detail"].lower() or "ig_text" in resp.json()["detail"].lower()
+        detail = resp.json()["detail"].lower()
+        assert "fb_text" in detail or "ig_text" in detail
 
     async def test_fb_text_max_length(
         self, client: AsyncClient, test_user: User, test_tenant: Tenant

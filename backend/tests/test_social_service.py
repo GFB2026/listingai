@@ -59,8 +59,14 @@ class TestValidatePhotoUrl:
 
     @pytest.mark.asyncio
     async def test_timeout(self):
-        with patch("httpx.AsyncClient.head", new_callable=AsyncMock, side_effect=httpx.TimeoutException("timeout")):
-            result = await validate_photo_url("https://example.com/slow.jpg")
+        with patch(
+            "httpx.AsyncClient.head",
+            new_callable=AsyncMock,
+            side_effect=httpx.TimeoutException("timeout"),
+        ):
+            result = await validate_photo_url(
+                "https://example.com/slow.jpg"
+            )
 
         assert result["valid"] is False
         assert "timed out" in result["error"]
@@ -136,7 +142,11 @@ class TestPostToFacebook:
     async def test_timeout(self):
         service = SocialService("token", "page123")
 
-        with patch("httpx.AsyncClient.post", new_callable=AsyncMock, side_effect=httpx.TimeoutException("timeout")):
+        with patch(
+            "httpx.AsyncClient.post",
+            new_callable=AsyncMock,
+            side_effect=httpx.TimeoutException("timeout"),
+        ):
             result = await service.post_to_facebook("Hello")
 
         assert result["success"] is False

@@ -45,7 +45,13 @@ async def validate_photo_url(url: str) -> dict:
     if not url:
         return {"valid": False, "error": "Photo URL is empty"}
     if not url.startswith(("http://", "https://")):
-        return {"valid": False, "error": f"Photo URL must start with http:// or https://, got '{url[:50]}'"}
+        return {
+            "valid": False,
+            "error": (
+                "Photo URL must start with http:// or"
+                f" https://, got '{url[:50]}'"
+            ),
+        }
 
     try:
         async with httpx.AsyncClient() as client:
@@ -54,7 +60,13 @@ async def validate_photo_url(url: str) -> dict:
             return {"valid": False, "error": f"Photo URL returned HTTP {resp.status_code}"}
         content_type = resp.headers.get("content-type", "").split(";")[0].strip().lower()
         if content_type and content_type not in _IMAGE_CONTENT_TYPES:
-            return {"valid": False, "error": f"Photo URL content-type is '{content_type}', expected an image"}
+            return {
+                "valid": False,
+                "error": (
+                    f"Photo URL content-type is"
+                    f" '{content_type}', expected an image"
+                ),
+            }
         return {"valid": True, "error": None}
     except httpx.TimeoutException:
         return {"valid": False, "error": "Photo URL validation timed out"}
@@ -144,7 +156,11 @@ class SocialService:
         except httpx.TimeoutException:
             return {"success": False, "post_id": None, "error": "Facebook API request timed out"}
         except httpx.ConnectError as e:
-            return {"success": False, "post_id": None, "error": f"Facebook API connection error: {e}"}
+            return {
+                "success": False,
+                "post_id": None,
+                "error": f"Facebook API connection error: {e}",
+            }
 
     # ── Instagram Business ────────────────────────────────────────
 
@@ -200,7 +216,11 @@ class SocialService:
         except httpx.TimeoutException:
             return {"success": False, "post_id": None, "error": "Instagram API request timed out"}
         except httpx.ConnectError as e:
-            return {"success": False, "post_id": None, "error": f"Instagram API connection error: {e}"}
+            return {
+                "success": False,
+                "post_id": None,
+                "error": f"Instagram API connection error: {e}",
+            }
 
     # ── Convenience ───────────────────────────────────────────────
 

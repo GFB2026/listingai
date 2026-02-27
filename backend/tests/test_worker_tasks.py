@@ -18,7 +18,13 @@ class TestSyncTenantHelper:
 
         mock_engine = MagicMock()
         mock_engine.sync_tenant = AsyncMock(
-            return_value=[{"connection_id": "c1", "created": 5, "updated": 0, "errors": 0, "total": 5}]
+            return_value=[{
+                "connection_id": "c1",
+                "created": 5,
+                "updated": 0,
+                "errors": 0,
+                "total": 5,
+            }]
         )
 
         tenant_id = str(uuid4())
@@ -84,7 +90,10 @@ class TestSyncTenantHelper:
         mock_session.commit = AsyncMock()
 
         # Patch _sync_tenant itself for this test
-        with patch("app.workers.tasks.mls_sync._sync_tenant", side_effect=[Exception("boom"), None]):
+        with patch(
+            "app.workers.tasks.mls_sync._sync_tenant",
+            side_effect=[Exception("boom"), None],
+        ):
             with patch(
                 "app.core.database.async_session_factory",
                 return_value=mock_session,
@@ -192,7 +201,10 @@ class TestBatchGenerateCeleryTask:
 
         with (
             patch("app.workers.tasks.content_batch.asyncio.run"),
-            patch("app.workers.tasks.content_batch.structlog.contextvars.bind_contextvars") as mock_bind,
+            patch(
+                "app.workers.tasks.content_batch"
+                ".structlog.contextvars.bind_contextvars",
+            ) as mock_bind,
         ):
             batch_generate_content(
                 tenant_id="t1", user_id="u1", listing_ids=["l1"],
@@ -400,7 +412,10 @@ class TestDownloadListingPhotosCeleryTask:
 
         with (
             patch("app.workers.tasks.media_process.asyncio.run"),
-            patch("app.workers.tasks.media_process.structlog.contextvars.bind_contextvars") as mock_bind,
+            patch(
+                "app.workers.tasks.media_process"
+                ".structlog.contextvars.bind_contextvars",
+            ) as mock_bind,
         ):
             download_listing_photos(
                 tenant_id="t1", listing_id="l1", photo_urls=[], correlation_id="req-abc",
@@ -440,7 +455,10 @@ class TestDownloadPhotosErrorHandling:
 
         mock_media = MagicMock()
         mock_media.download_from_url = AsyncMock(
-            side_effect=[Exception("network error"), {"media_id": "m2", "key": "path/2.jpg"}]
+            side_effect=[
+                Exception("network error"),
+                {"media_id": "m2", "key": "path/2.jpg"},
+            ]
         )
 
         mock_session = AsyncMock()
@@ -455,8 +473,16 @@ class TestDownloadPhotosErrorHandling:
 
         with (
             patch("app.services.media_service.MediaService", return_value=mock_media),
-            patch("app.workers.tasks.media_process.async_session_factory", return_value=mock_session),
-            patch("app.workers.tasks.media_process.set_tenant_context", new_callable=AsyncMock),
+            patch(
+                "app.workers.tasks.media_process"
+                ".async_session_factory",
+                return_value=mock_session,
+            ),
+            patch(
+                "app.workers.tasks.media_process"
+                ".set_tenant_context",
+                new_callable=AsyncMock,
+            ),
         ):
             await _download_photos(
                 str(uuid4()), str(uuid4()),
