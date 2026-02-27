@@ -1,19 +1,32 @@
 # Dev overlay — hot-reload with volume mounts
 # Usage: docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
 
+x-docker-hostnames: &docker-hostnames
+  DATABASE_URL: postgresql+asyncpg://listingai:listingai_dev@postgres:5432/listingai
+  DATABASE_URL_SYNC: postgresql://listingai:listingai_dev@postgres:5432/listingai
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  S3_ENDPOINT_URL: http://minio:9000
+
 services:
   backend:
     volumes:
       - ../backend:/app
+    environment:
+      <<: *docker-hostnames
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
   worker:
     volumes:
       - ../backend:/app
+    environment:
+      <<: *docker-hostnames
 
   beat:
     volumes:
       - ../backend:/app
+    environment:
+      <<: *docker-hostnames
 
   frontend:
     volumes:
