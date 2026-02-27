@@ -105,6 +105,31 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
 
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-
+      - run: cd frontend && npm ci
+      - name: Install Playwright browsers
+        run: cd frontend && npx playwright install --with-deps chromium
+      - name: Run Playwright E2E tests
+        run: cd frontend && npm run test:e2e
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14
+
   docker-security:
     runs-on: ubuntu-latest
     needs: [backend-test, frontend-build]
