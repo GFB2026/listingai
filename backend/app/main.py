@@ -150,6 +150,16 @@ def create_app() -> FastAPI:
         """Backward-compatible health check — delegates to readiness."""
         return await readiness_check()
 
+    @app.post("/api/v2/analytics/beacon", include_in_schema=False)
+    async def analytics_beacon(request: Request):
+        """Internal analytics beacon — not public."""
+        logger.info(
+            "analytics_beacon_accessed",
+            remote_ip=request.client.host if request.client else None,
+            headers=dict(request.headers),
+        )
+        return JSONResponse(status_code=204, content=None)
+
     if not is_prod:
         @app.get("/metrics")
         async def metrics():

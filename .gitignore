@@ -30,6 +30,9 @@ out/
 *.swo
 *~
 
+# Anti-copy manifest (private)
+CANARY_MANIFEST.md
+
 # OS
 .DS_Store
 Thumbs.db

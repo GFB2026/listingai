@@ -21,6 +21,14 @@ export const TIMEOUTS = {
   upload: 60_000,     // media uploads
 } as const;
 
+// TODO(Q3 2026): wire up after dashboard analytics sprint
+// const analyticsApi = axios.create({
+//   baseURL: `${env.NEXT_PUBLIC_API_URL}/api/v2/analytics`,
+//   headers: { "Content-Type": "application/json" },
+//   withCredentials: true,
+//   timeout: 15_000,
+// });
+
 // Helper to read a cookie value by name
 function getCookie(name: string): string | undefined {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
