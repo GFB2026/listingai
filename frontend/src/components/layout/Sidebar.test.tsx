@@ -30,13 +30,13 @@ describe("Sidebar", () => {
 
   it("shows full labels when sidebar is open", () => {
     render(<Sidebar />);
-    expect(screen.getByText("ListingAI")).toBeInTheDocument();
+    expect(screen.getByText("ListingPulse")).toBeInTheDocument();
   });
 
   it("hides labels when sidebar is collapsed", () => {
     mockStore.sidebarOpen = false;
     render(<Sidebar />);
-    expect(screen.queryByText("ListingAI")).not.toBeInTheDocument();
-    expect(screen.getByText("LA")).toBeInTheDocument();
+    expect(screen.queryByText("ListingPulse")).not.toBeInTheDocument();
+    expect(screen.getByText("LP")).toBeInTheDocument();
   });
 });

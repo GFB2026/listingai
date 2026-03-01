@@ -34,7 +34,7 @@ export function Sidebar() {
     >
       <div className="flex h-14 items-center border-b border-gray-200 px-4">
         <Link href="/" className="text-lg font-bold text-primary">
-          {sidebarOpen ? "ListingAI" : "LA"}
+          {sidebarOpen ? "ListingPulse" : "LP"}
         </Link>
       </div>
 

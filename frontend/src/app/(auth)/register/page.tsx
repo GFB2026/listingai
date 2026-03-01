@@ -56,7 +56,7 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-surface px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-primary">ListingAI</h1>
+          <h1 className="text-3xl font-bold text-primary">ListingPulse</h1>
           <p className="mt-2 text-gray-600">Register your brokerage</p>
         </div>
 

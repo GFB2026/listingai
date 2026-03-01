@@ -6,7 +6,7 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="text-2xl font-bold text-primary">ListingAI</div>
+          <div className="text-2xl font-bold text-primary">ListingPulse</div>
           <div className="flex items-center gap-4">
             <Link
               href="/login"
@@ -91,7 +91,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-gray-50 px-6 py-8">
         <div className="mx-auto max-w-6xl text-center text-sm text-gray-500">
-          &copy; {new Date().getFullYear()} ListingAI. Built for Broward County
+          &copy; {new Date().getFullYear()} ListingPulse. Built for Broward County
           brokerages.
         </div>
       </footer>

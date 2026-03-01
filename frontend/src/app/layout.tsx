@@ -7,8 +7,8 @@ initSentry();
 
 export const metadata: Metadata = {
   title: {
-    default: "ListingAI - AI-Powered Real Estate Content",
-    template: "%s | ListingAI",
+    default: "ListingPulse - AI-Powered Real Estate Content",
+    template: "%s | ListingPulse",
   },
   description:
     "Generate listing descriptions, social media posts, email campaigns, and more from your MLS data.",

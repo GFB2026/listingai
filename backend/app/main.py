@@ -52,7 +52,7 @@ def create_app() -> FastAPI:
     is_prod = settings.app_env == "production"
 
     app = FastAPI(
-        title="ListingAI",
+        title="ListingPulse",
         description="AI-Powered Real Estate Content Engine",
         version="0.1.0",
         docs_url=None if is_prod else "/docs",

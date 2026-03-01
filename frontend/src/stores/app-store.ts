@@ -15,7 +15,7 @@ export const useAppStore = create<AppState>()(
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
     }),
     {
-      name: "listingai-app-store",
+      name: "listingpulse-app-store",
     }
   )
 );

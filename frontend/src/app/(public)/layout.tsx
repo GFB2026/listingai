@@ -24,7 +24,7 @@ export default function PublicLayout({
     <div className="min-h-screen bg-surface">
       <main>{children}</main>
       <footer className="border-t border-gray-200 bg-white px-4 py-6 text-center text-xs text-gray-400">
-        <p>Powered by ListingAI</p>
+        <p>Powered by ListingPulse</p>
       </footer>
     </div>
   );

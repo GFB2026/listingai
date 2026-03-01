@@ -1,4 +1,4 @@
-# ListingAI - AI-Powered Real Estate Content Engine
+# ListingPulse - AI-Powered Real Estate Content Engine
 
 > **Version 1.3.0** | 304 tests | 97% coverage | Production-ready
 

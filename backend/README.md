@@ -1,4 +1,4 @@
-# ListingAI Backend
+# ListingPulse Backend
 
 Multi-tenant SaaS platform for AI-powered real estate marketing. FastAPI + PostgreSQL backend with Claude integration for automated content generation, social media publishing, email campaigns, and branded flyer export.
 

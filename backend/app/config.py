@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     # SendGrid (email delivery)
     sendgrid_api_key: str = ""
     sendgrid_default_from_email: str = "noreply@listingai.com"
-    sendgrid_default_from_name: str = "ListingAI"
+    sendgrid_default_from_name: str = "ListingPulse"
 
     # MLS
     mls_default_base_url: str = "https://api-trestle.corelogic.com"

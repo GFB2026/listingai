@@ -204,12 +204,12 @@
   ],
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["listingai", "backend"],
+  "tags": ["listingpulse", "backend"],
   "templating": { "list": [] },
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "ListingAI Backend",
-  "uid": "listingai-backend",
+  "title": "ListingPulse Backend",
+  "uid": "listingpulse-backend",
   "version": 1
 }
